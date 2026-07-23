@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "description": "Golden set for retrieval + answer-quality evals. Written by hand while reading each paper. Target: 25-30 entries. `source_paper` must match the paper_id used at ingest time; `source_sections`/`source_pages` are the ground-truth chunk locations for hit-rate@k and MRR.",
+  "questions": [
+    {
+      "id": "act-001",
+      "question": "REPLACE ME: e.g. Why does ACT predict chunks of actions instead of single actions?",
+      "reference_answer": "REPLACE ME: 2-4 sentence hand-written answer, grounded in the paper.",
+      "source_paper": "act",
+      "source_sections": ["REPLACE ME: e.g. 'IV. Method'"],
+      "source_pages": [0],
+      "difficulty": "easy",
+      "tags": ["action-chunking"]
+    },
+    {
+      "id": "dp-001",
+      "question": "REPLACE ME",
+      "reference_answer": "REPLACE ME",
+      "source_paper": "diffusion-policy",
+      "source_sections": [],
+      "source_pages": [],
+      "difficulty": "medium",
+      "tags": []
+    },
+    {
+      "id": "pi0-001",
+      "question": "REPLACE ME",
+      "reference_answer": "REPLACE ME",
+      "source_paper": "pi-0",
+      "source_sections": [],
+      "source_pages": [],
+      "difficulty": "medium",
+      "tags": []
+    },
+    {
+      "id": "pi05-001",
+      "question": "REPLACE ME",
+      "reference_answer": "REPLACE ME",
+      "source_paper": "pi-0.5",
+      "source_sections": [],
+      "source_pages": [],
+      "difficulty": "hard",
+      "tags": []
+    },
+    {
+      "id": "gaia1-001",
+      "question": "REPLACE ME: blog entry — no pages, metrics match on section only",
+      "reference_answer": "REPLACE ME",
+      "source_paper": "introducing-gaia1",
+      "source_sections": ["REPLACE ME: e.g. 'What is a world model?'"],
+      "source_pages": [],
+      "difficulty": "easy",
+      "tags": ["world-models", "blog"]
+    }
+  ]
+}

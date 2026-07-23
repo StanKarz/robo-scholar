@@ -1,0 +1,33 @@
+[project]
+name = "robo-scholar"
+version = "0.1.0"
+description = "RoboScholar — agentic research assistant for embodied AI papers, with a real eval harness"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "anthropic>=0.116.0",
+    "chromadb>=1.5.9",
+    "marimo>=0.23.14",
+    "pydantic>=2.13.4",
+    "pymupdf>=1.28.0",
+    "rank-bm25>=0.2.2",
+    "rich>=15.0.0",
+    "ruff>=0.15.21",
+    "trafilatura>=2.1.0",
+    "typer>=0.27.0",
+]
+
+[project.scripts]
+rs = "roboscholar.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["roboscholar"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
