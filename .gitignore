@@ -17,5 +17,10 @@ data/chroma/
 *.db
 *.sqlite3
 
+# Fetched corpus — rebuildable via `rs fetch` from data/raw/papers.json.
+# The manifest (what each paper is, where it came from, its sha256) is committed;
+# the PDFs are not. Keeps the repo small and avoids redistributing arXiv PDFs.
+data/raw/papers/
+
 # Local project notes — not tracked
 CLAUDE.md

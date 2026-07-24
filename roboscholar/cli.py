@@ -11,6 +11,40 @@ console = Console()
 
 
 @app.command()
+def fetch(
+    manifest: str = typer.Option("data/raw/papers.json", help="Manifest listing the papers."),
+    dest: str = typer.Option("data/raw/papers", help="Where to write the PDFs."),
+    force: bool = typer.Option(False, "--force", help="Re-download even if a valid copy exists."),
+):
+    """Download the paper corpus listed in the manifest and verify checksums."""
+    from pathlib import Path
+
+    from rich.table import Table
+
+    from roboscholar.fetch import fetch_all
+
+    results = fetch_all(Path(manifest), Path(dest), force)
+
+    table = Table(title=f"Fetched into {dest}")
+    for col in ("paper", "arxiv", "status", "detail"):
+        table.add_column(col)
+    colours = {"ok": "green", "cached": "cyan", "checksum-mismatch": "yellow", "error": "red"}
+    for r in results:
+        table.add_row(
+            r.paper.id,
+            r.paper.arxiv_id,
+            f"[{colours.get(r.status, 'white')}]{r.status}[/]",
+            r.detail,
+        )
+    console.print(table)
+
+    failed = [r for r in results if r.status not in ("ok", "cached")]
+    if failed:
+        console.print(f"[red]{len(failed)} of {len(results)} failed.[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
 def ingest(
     path: str = typer.Argument("data/raw", help="PDF file, markdown file, or directory to ingest."),
     n_words: int = typer.Option(500, help="Target chunk size in words."),

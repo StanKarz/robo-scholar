@@ -1,0 +1,47 @@
+[
+  {
+    "id": "ACT",
+    "title": "Learning Fine-Grained Bimanual Manipulation with Low-Cost Hardware",
+    "arxiv_id": "2304.13705v1",
+    "url": "https://arxiv.org/pdf/2304.13705v1",
+    "filename": "ACT.pdf",
+    "bytes": 5353485,
+    "sha256": "2e2fe25860f5f9cee9e655a2714e9f2264a7a5078bcd267c16d3f39af461345a"
+  },
+  {
+    "id": "diffusion-policy",
+    "title": "Diffusion Policy: Visuomotor Policy Learning via Action Diffusion",
+    "arxiv_id": "2303.04137v5",
+    "url": "https://arxiv.org/pdf/2303.04137v5",
+    "filename": "diffusion-policy.pdf",
+    "bytes": 6192199,
+    "sha256": "b65c474b696a4802d8f1457d86b637ce2c5521412570d3aa928cd54563babc8f"
+  },
+  {
+    "id": "pi-0",
+    "title": "π0: A Vision-Language-Action Flow Model for General Robot Control",
+    "arxiv_id": "2410.24164v4",
+    "url": "https://arxiv.org/pdf/2410.24164v4",
+    "filename": "pi-0.pdf",
+    "bytes": 7893845,
+    "sha256": "fbdfba56258bdbd220207ba63410c6c943e43a73e97a7a5a47ca0bc74204f821"
+  },
+  {
+    "id": "pi-0.5",
+    "title": "π0.5: a Vision-Language-Action Model with Open-World Generalization",
+    "arxiv_id": "2504.16054v1",
+    "url": "https://arxiv.org/pdf/2504.16054v1",
+    "filename": "pi-0.5.pdf",
+    "bytes": 16213397,
+    "sha256": "6a1029fd8ab6944b74cf22f5e5d30e60bc15699d964b2900af799b807a34b64c"
+  },
+  {
+    "id": "dreamer-v3",
+    "title": "Mastering Diverse Domains through World Models",
+    "arxiv_id": "2301.04104v2",
+    "url": "https://arxiv.org/pdf/2301.04104v2",
+    "filename": "world-models.pdf",
+    "bytes": 2874717,
+    "sha256": "d0385798e8bada8e81b915c1743be81d9ce8776f12ed937e09351995e099ce37"
+  }
+]

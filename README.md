@@ -212,7 +212,8 @@ robo-scholar/
 │       └── runner.py         # run configs + scores → SQLite         [I write]
 ├── data/
 │   ├── raw/
-│   │   ├── papers/           # source PDFs (ACT, DP, pi0, pi0.5, world-models)
+│   │   ├── papers.json       # manifest: arxiv id, versioned url, sha256
+│   │   ├── papers/           # source PDFs, via `rs fetch`  (gitignored)
 │   │   ├── blogs/            # downloaded blog posts as markdown
 │   │   └── blogs.json        # manifest of blog sources (title + url)
 │   ├── chroma/               # Chroma persistence dir     (gitignored)
@@ -223,7 +224,14 @@ robo-scholar/
 ```
 
 Everything generated (Chroma index, SQLite) lives under `data/` and is rebuildable
-from `data/raw/` — only raw sources and code are committed.
+from `data/raw/` — only code and manifests are committed.
+
+The paper corpus is **not** committed. `data/raw/papers.json` records what each paper is and
+where it came from (arXiv id, versioned URL, byte count, sha256); `rs fetch` downloads them
+into `data/raw/papers/` and verifies every file against its checksum. That keeps ~38MB of
+PDFs out of git, avoids redistributing arXiv's copies, and still gives anyone cloning the repo
+a byte-identical corpus. The URLs are version-pinned (`…v1`, `…v5`) on purpose: an unversioned
+arXiv URL follows the latest revision, so its bytes drift and the checksum stops meaning anything.
 
 ---
 
@@ -231,6 +239,7 @@ from `data/raw/` — only raw sources and code are committed.
 
 ```bash
 uv sync                      # install everything incl. the `rs` script
+uv run rs fetch              # download the paper corpus (~38MB) and verify checksums
 export ANTHROPIC_API_KEY=sk-ant-...   # from console.anthropic.com (billing is separate from Claude Code)
 uv run rs --help             # CLI skeleton — commands exist, all raise "not implemented"
 ```
