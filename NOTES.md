@@ -1,9 +1,124 @@
 # NOTES — decisions, tradeoffs, reasoning
 
-Running log of the non-obvious decisions in this project and why they were made.
-One entry per decision; newest sections at the bottom. Spec-level decisions
-(no frameworks, Chroma, CLI-first, model split) live in README §3 — this file
-covers the choices made *while building*.
+Running log of the non-obvious decisions in this project and why they were
+made, plus the architecture itself — this is the file that explains how
+RoboScholar actually works, not just the pitch (that's README.md) or personal
+learning notes (that's COMPREHENSION.md). One entry per decision; newest
+sections at the bottom, except the two orientation sections right below,
+which are meant to be read first.
+
+---
+
+## How it all fits together
+
+```
+PDF / blog post
+      │  ingest.py: parse, detect sections, chunk
+      ▼
+chunks + metadata  (text, paper_id, section, page)
+      │  embed each chunk once
+      ▼
+Chroma  (vector store — chunk vector + text + metadata)
+
+question ──embed──▶ query vector ──cosine similarity──▶ top-k chunks
+                                                              │
+                        ┌─────────────────────────────────────┤
+                        ▼                                     ▼
+          agent.py uses them to answer /          eval harness scores the
+          quiz / compare, with citations          pipeline (see table below)
+```
+
+**Chunks get vector embeddings, not word embeddings.** Each chunk (a
+section-aware slice of a document, a few hundred words) becomes *one* dense
+vector — not one vector per word, which is the older word2vec-style approach
+and isn't what's used here. The vector's job is purely geometric: texts with
+similar meaning end up as vectors that sit close together, measured by cosine
+similarity, so "find relevant chunks" becomes "find nearby vectors" with no
+LLM call involved. Chroma is the storage + nearest-neighbour search over
+those vectors; `search_corpus` is the tool wrapping that search.
+
+**Two separate scoring stages — this is the part that's easy to tangle up:**
+
+| Stage | Question it answers | How | Cost |
+| --- | --- | --- | --- |
+| Retrieval metrics (hit-rate@k, MRR) | Did search find a chunk from the *labelled* section/page? | Compare retrieved chunk metadata to golden labels | Free, instant, no LLM |
+| LLM-as-judge | Given what was found, was the *written answer* actually correct? | Sonnet reads generated vs. reference answer | One real LLM call per question |
+
+Cosine similarity only ever answers the first question — it is **not** a
+correctness check. Two sentences can sit close together in embedding space
+while asserting opposite things ("X causes Y" vs. "X prevents Y" are
+topically near-identical vectors). Judging whether a written answer is
+actually correct needs real reading comprehension, which is what the judge
+is for. The two stages can fail independently: retrieval can succeed while
+the written answer is still bad, or retrieval can fail while the model
+answers correctly anyway from its own training data — the second case is a
+real failure, since it means the system isn't actually using the corpus.
+
+**Why this instead of pasting the paper into a long-context chat?** For one
+paper in one sitting, pasting it in and asking for a quiz is a fair
+alternative and probably faster to set up — modern context windows are
+genuinely good now, and that's not a hole in the argument, it's just a
+different tradeoff. This system's edge shows up as the corpus grows (no
+re-pasting every document on every question — embed once, query cheaply),
+in checkable citations (an answer points at a specific section/page instead
+of the model's fuzzy memory of a popular paper's internet-summary version),
+and in persistence (quiz history survives across sessions in SQLite, a chat
+window doesn't). The plainest honest framing: comprehension alone doesn't
+require this infrastructure — building and evaluating the infrastructure is
+the actual point, and the quizzing is a genuinely useful side effect of
+having it.
+
+---
+
+## Stack choices
+
+| Layer | Choice | Why / tradeoff |
+| --- | --- | --- |
+| LLM | Anthropic SDK direct, no LangChain/LlamaIndex | Frameworks hide the loop you need to be able to explain; more code, but the code is the point |
+| Vector DB | Chroma (embedded, local) | Zero infra, persists to disk; fewer prod features than Qdrant, but v1 doesn't need them |
+| Embeddings | voyage-3-lite (API) vs. bge-small / all-MiniLM (local) | Decided by the eval harness, not taste — see "Embedding model choice" below |
+| PDF parsing | PyMuPDF first, Docling as plan B | Academic PDFs are hostile (two columns, equations, figures); never silently degrade to a naive text dump |
+| Search | Dense first; BM25 + reciprocal rank fusion is the planned upgrade | Hybrid retrieval is common in practice and RRF is ~20 lines to implement directly |
+| Interface | Typer + Rich CLI | Ships fast; a web UI is an explicit non-goal (README) |
+| Storage (non-vector) | SQLite via stdlib | Quiz history + eval run scores |
+
+### Anthropic SDK — the agent loop mechanics
+
+`client = anthropic.Anthropic()` picks up `ANTHROPIC_API_KEY` from the env.
+One endpoint does everything: `client.messages.create(model=..., tools=...,
+messages=...)`. The loop: while `response.stop_reason == "tool_use"`, execute
+each `tool_use` block with a real Python function and append a `tool_result`
+block (matched by `tool_use_id`) as the next user message — multiple tool
+calls in one response all go back in a single user message. Model split:
+`claude-sonnet-5` for the agent loop and the judge, `claude-haiku-4-5` for
+quiz generation and other cheap tasks. Use prompt caching
+(`cache_control: {"type": "ephemeral"}`) on the stable prefix (system prompt
++ tool schemas) since the loop re-sends them every iteration. Docs:
+[tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview),
+[structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)
+(for `JudgeScore` / `QuizQuestion`),
+[prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching).
+
+### Chroma — the retrieval mechanics
+
+Embedded mode, persisted to disk: `chromadb.PersistentClient(path="data/chroma")`
+— no server, no infra. `collection = client.get_or_create_collection(name="papers")`,
+then `collection.add(ids=..., documents=..., embeddings=..., metadatas=...)`
+where metadata carries `paper_id`/`section`/`page` for citations and eval
+labels, and `collection.query(query_embeddings=..., n_results=k, where={...})`
+returns top-k with distances (`where` implements the paper filter). Passing
+only `documents` makes Chroma silently embed with its default model
+(all-MiniLM via ONNX) — instead, compute embeddings explicitly and pass
+`embeddings=`, so the embedding model stays a swappable config value the eval
+harness can sweep, and query/ingest embeddings are guaranteed consistent.
+Docs: [Chroma getting started](https://docs.trychroma.com/docs/overview/getting-started).
+
+### Still to look up
+
+Reciprocal rank fusion (the week-2 hybrid-search upgrade —
+[rank-bm25](https://github.com/dorianbrown/rank_bm25)); LLM-as-judge pitfalls
+(position bias, verbosity bias, why few-shot rubrics help); the
+[arXiv API](https://info.arxiv.org/help/api/index.html) for `fetch_arxiv`.
 
 ---
 
@@ -201,14 +316,26 @@ complementary, not summable:
 
 ---
 
-## Evals (planned flow — for orientation)
+## Ideas — parked, not built
 
-The golden set is labels + reference answers written while reading the papers.
-Retrieval metrics need only the labels: embed each golden question → query
-Chroma top-k → check whether retrieved chunks' section/page match the label →
-hit-rate@k and MRR. No LLM, free, seconds per run. This is the workhorse that
-settles chunk size, overlap, and the embedding model choice: change ONE
-variable → re-ingest → re-run metrics → compare in the runner's SQLite history.
-The LLM-as-judge (faithfulness/correctness of generated answers) comes later
-and needs the reference answers + a working agent; it's for judging the whole
-pipeline, not for tuning retrieval knobs.
+Written down so they aren't lost, not commitments. CLAUDE.md's "no new
+features after Day 10" guardrail exists specifically to fight scope creep;
+these stay parked until retrieval.py + the eval harness (the actual
+differentiator per README) are done.
+
+**Glossary.** Reader marks a term while reading; the system resolves it
+against the corpus into a grounded, cited definition, splitting senses when
+the same term means different things in different documents (e.g.
+"embodiment" in a GAIA-3 post vs. in pi-0). Full design in
+`GLOSSARY_DESIGN.md`. The input side is already built — `glossary/terms.txt`,
+`roboscholar/glossary.py`, `rs glossary status` — resolution needs
+retrieval.py to exist first.
+
+**Concept visualisation / simulation.** Floated 2026-09: for a concept like
+action chunking or temporal ensembling, generate a small visual or
+simulation of how it works instead of only prose. Undesigned — open
+questions before this goes further: output format (an Artifact? a notebook
+cell?), generated on-demand per question or pre-built per concept, and
+whether "simulation" means an actual numeric simulation of the method or an
+illustrative animation — those are very different scopes and worth pinning
+down before any code gets written.
