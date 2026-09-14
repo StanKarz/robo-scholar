@@ -2,8 +2,7 @@
 
 Running log of the non-obvious decisions in this project and why they were
 made, plus the architecture itself — this is the file that explains how
-RoboScholar actually works, not just the pitch (that's README.md) or personal
-learning notes (that's COMPREHENSION.md). One entry per decision; newest
+RoboScholar actually works, not just the pitch (that's README.md). One entry per decision; newest
 sections at the bottom, except the two orientation sections right below,
 which are meant to be read first.
 
@@ -39,10 +38,10 @@ those vectors; `search_corpus` is the tool wrapping that search.
 
 **Two separate scoring stages — this is the part that's easy to tangle up:**
 
-| Stage | Question it answers | How | Cost |
-| --- | --- | --- | --- |
-| Retrieval metrics (hit-rate@k, MRR) | Did search find a chunk from the *labelled* section/page? | Compare retrieved chunk metadata to golden labels | Free, instant, no LLM |
-| LLM-as-judge | Given what was found, was the *written answer* actually correct? | Sonnet reads generated vs. reference answer | One real LLM call per question |
+| Stage                               | Question it answers                                               | How                                               | Cost                           |
+| ----------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------- | ------------------------------ |
+| Retrieval metrics (hit-rate@k, MRR) | Did search find a chunk from the*labelled* section/page?        | Compare retrieved chunk metadata to golden labels | Free, instant, no LLM          |
+| LLM-as-judge                        | Given what was found, was the*written answer* actually correct? | Sonnet reads generated vs. reference answer       | One real LLM call per question |
 
 Cosine similarity only ever answers the first question — it is **not** a
 correctness check. Two sentences can sit close together in embedding space
@@ -72,32 +71,32 @@ having it.
 
 ## Stack choices
 
-| Layer | Choice | Why / tradeoff |
-| --- | --- | --- |
-| LLM | Anthropic SDK direct, no LangChain/LlamaIndex | Frameworks hide the loop you need to be able to explain; more code, but the code is the point |
-| Vector DB | Chroma (embedded, local) | Zero infra, persists to disk; fewer prod features than Qdrant, but v1 doesn't need them |
-| Embeddings | voyage-3-lite (API) vs. bge-small / all-MiniLM (local) | Decided by the eval harness, not taste — see "Embedding model choice" below |
-| PDF parsing | PyMuPDF first, Docling as plan B | Academic PDFs are hostile (two columns, equations, figures); never silently degrade to a naive text dump |
-| Search | Dense first; BM25 + reciprocal rank fusion is the planned upgrade | Hybrid retrieval is common in practice and RRF is ~20 lines to implement directly |
-| Interface | Typer + Rich CLI | Ships fast; a web UI is an explicit non-goal (README) |
-| Storage (non-vector) | SQLite via stdlib | Quiz history + eval run scores |
+| Layer                | Choice                                                            | Why / tradeoff                                                                                           |
+| -------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| LLM                  | Anthropic SDK direct, no LangChain/LlamaIndex                     | Frameworks hide the loop you need to be able to explain; more code, but the code is the point            |
+| Vector DB            | Chroma (embedded, local)                                          | Zero infra, persists to disk; fewer prod features than Qdrant, but v1 doesn't need them                  |
+| Embeddings           | voyage-3-lite (API) vs. bge-small / all-MiniLM (local)            | Decided by the eval harness, not taste — see "Embedding model choice" below                             |
+| PDF parsing          | PyMuPDF first, Docling as plan B                                  | Academic PDFs are hostile (two columns, equations, figures); never silently degrade to a naive text dump |
+| Search               | Dense first; BM25 + reciprocal rank fusion is the planned upgrade | Hybrid retrieval is common in practice and RRF is ~20 lines to implement directly                        |
+| Interface            | Typer + Rich CLI                                                  | Ships fast; a web UI is an explicit non-goal (README)                                                    |
+| Storage (non-vector) | SQLite via stdlib                                                 | Quiz history + eval run scores                                                                           |
 
 ### Anthropic SDK — the agent loop mechanics
 
 `client = anthropic.Anthropic()` picks up `ANTHROPIC_API_KEY` from the env.
-One endpoint does everything: `client.messages.create(model=..., tools=...,
-messages=...)`. The loop: while `response.stop_reason == "tool_use"`, execute
+One endpoint does everything: `client.messages.create(model=..., tools=..., messages=...)`. The loop: while `response.stop_reason == "tool_use"`, execute
 each `tool_use` block with a real Python function and append a `tool_result`
 block (matched by `tool_use_id`) as the next user message — multiple tool
 calls in one response all go back in a single user message. Model split:
 `claude-sonnet-5` for the agent loop and the judge, `claude-haiku-4-5` for
 quiz generation and other cheap tasks. Use prompt caching
 (`cache_control: {"type": "ephemeral"}`) on the stable prefix (system prompt
+
 + tool schemas) since the loop re-sends them every iteration. Docs:
-[tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview),
-[structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)
-(for `JudgeScore` / `QuizQuestion`),
-[prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching).
+  [tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview),
+  [structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)
+  (for `JudgeScore` / `QuizQuestion`),
+  [prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching).
 
 ### Chroma — the retrieval mechanics
 
@@ -168,14 +167,15 @@ when adding a new paper.
 (`consume_key`), not string equality. Every complication was found empirically,
 not speculatively:
 
-| Problem | Example | Fix |
-| --- | --- | --- |
-| Small caps extract with spaces | `"I NTRODUCTION"` | normalize to `[a-z0-9]` only |
-| ToC and page number headings differently | ToC `IV-A …` vs page `A. …` | strip leading numbering from both sides |
-| Heading merged with first paragraph | `"IV. ACTION CHUNKING … As we will see"` | prefix-match, keep remainder as body text |
-| Heading split across two blocks | `"III. ALOHA: A LOW-COST…"` + next block | pending-continuation state |
-| Equation fragment impersonating a heading | `"×K"` normalizing to `"k"` | partial match requires ≥8 normalized chars |
-| References missing from ToC | ACT bibliography polluting §VII | any `References`/`Bibliography` block forces a section boundary |
+| Problem                                   | Example                                     | Fix                                                                |
+| ----------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------ |
+| Small caps extract with spaces            | `"I NTRODUCTION"`                         | normalize to`[a-z0-9]` only                                      |
+| ToC and page number headings differently  | ToC`IV-A …` vs page `A. …`            | strip leading numbering from both sides                            |
+| Heading merged with first paragraph       | `"IV. ACTION CHUNKING … As we will see"` | prefix-match, keep remainder as body text                          |
+| Heading split across two blocks           | `"III. ALOHA: A LOW-COST…"` + next block | pending-continuation state                                         |
+| Equation fragment impersonating a heading | `"×K"` normalizing to `"k"`            | partial match requires ≥8 normalized chars                        |
+| References missing from ToC               | ACT bibliography polluting §VII            | any`References`/`Bibliography` block forces a section boundary |
+| Non-ASCII symbol in heading silently dropped | `"π0 Model"` → emitted as `"The 0 Model"` | Normalization strips non-`[a-z0-9]` chars, Greek letters included — always check the actual emitted label rather than assuming the source heading text survives (found on pi-0/pi-0.5, which also emit no numeric ToC prefixes at all, unlike ACT/Diffusion Policy) |
 
 **Figure/table captions dropped.** Chunk review showed captions ("Fig. 1:
 ALOHA…") mixed into content chunks — layout description, not comprehension
@@ -221,6 +221,34 @@ regex; `chunk_section` and the record schema are shared with the PDF path.
 h1/h2 both map to level 1 because a blog's single h1 is its title. Markdown has
 no pages → `page_start`/`page_end` = 0.
 
+**Markdown sectioning, settled empirically (2026-09).** Three questions were
+open long enough to be worth recording the answers, all confirmed by dumping
+real emitted labels rather than reasoning about the regex:
+
+- *Content between the h1 and the first h2* opens a section named by the h1
+  title text (so GAIA-3's five opening paragraphs live under
+  `"GAIA-3: Scaling World Models to Power Safety and Evaluation"`). It isn't
+  dropped and doesn't attach forward to the following h2 — the two dangerous
+  cases.
+- *h3s are their own sections*, emitted as compound `Parent › Child` labels.
+  Without this, GAIA-3's five h3s would have collapsed into one enormous
+  section and three golden entries would have carried labels for sections
+  that don't exist.
+- *PDF sections store the ToC-qualified form* (`VI Ablations › VI-A Action
+  Chunking and Temporal Ensembling`). This is load-bearing on ACT
+  specifically, which has three `A.` subsections, two of which differ by one
+  word: `IV-A Action Chunking and Temporal Ensemble` (the method) and
+  `VI-A Action Chunking and Temporal Ensembling` (the ablation). Qualifying
+  by parent makes subsection names unique by construction.
+
+`unmatched` stays the per-document diagnostic and should be empty. As of
+2026-09-14 every document ingests clean except `path_towards_autonomous_mach`
+(LeCun), which reports two unmatched level-1 headings — "A Model Architecture
+for Autonomous Intelligence" (p7) and "Designing the Configurator" (p38).
+Content from those regions is currently filed under whatever section precedes
+it, so any golden entry drawn from there would be mislabelled. Harmless while
+that paper has no golden entries; fix before it gets any.
+
 **Chunk IDs: `{doc_id}:{index:04d}`** (e.g. `act:0012`), where `doc_id` is the
 file stem. Deterministic for a given (document, chunk params), so re-ingesting
 overwrites rather than duplicates in Chroma. Consequence: IDs are NOT stable
@@ -253,11 +281,11 @@ realistic* inputs or they test nothing.
 
 Candidates and their hard constraints:
 
-| Model | Where | Cost | Input limit | Notes |
-| --- | --- | --- | --- | --- |
-| voyage-3-lite | API | ~free at this corpus size (token-priced) | 32k tok | needs network + key |
-| bge-small-en-v1.5 | local (M1) | free | 512 tok (~380 words) | the real local candidate |
-| all-MiniLM-L6-v2 | local | free | **256 tok (~190 words)** | truncates silently |
+| Model             | Where      | Cost                                     | Input limit                    | Notes                    |
+| ----------------- | ---------- | ---------------------------------------- | ------------------------------ | ------------------------ |
+| voyage-3-lite     | API        | ~free at this corpus size (token-priced) | 32k tok                        | needs network + key      |
+| bge-small-en-v1.5 | local (M1) | free                                     | 512 tok (~380 words)           | the real local candidate |
+| all-MiniLM-L6-v2  | local      | free                                     | **256 tok (~190 words)** | truncates silently       |
 
 Process: fixed golden set, full (small) grid — 2–3 embedders × 2 chunk sizes ×
 3 overlaps ≈ 12–18 ingest+metric runs, each seconds and ~free — stored in the
@@ -282,13 +310,50 @@ should retrieve the blog, not the paper.
 
 ---
 
+## Reading queue — candidate papers, not yet in golden.json
+
+Found 2026-09 while researching a separate Transformers blog post. More
+LLM/world-model adjacent than the current embodied-AI corpus, but relevant
+enough to add 2-3 golden questions each once actually read:
+
+- LeCun, "A Path Towards Autonomous Machine Intelligence" (v0.9.2, 2022-06-27)
+- Apple, "The Illusion of Thinking" (machinelearning.apple.com)
+- "LeWorldModel: Stable End-to-End Joint-Embedding Predictive Architecture
+  from Pixels" (arXiv 2603.19312)
+- Rohit Bandaru, "JEPA Deep Dive" (blog post)
+
+None ingested yet. Adding one means: drop the PDF or fetch the blog per the
+existing `data/raw/` pattern, ingest, check `unmatched` is empty, then read it
+properly before writing questions. This is a read-before-write list, not a
+task queue — the golden set's value is that every entry came from Stan
+actually reading, and that doesn't change because the backlog is longer.
+
+---
+
 ## Retrieval metrics — how they work, how to read them
 
 Both metrics run per golden question against the top-k chunks retrieved for it.
 A retrieved chunk counts as **correct** when its `paper_id` matches the label
-and its section matches `source_sections` (or its page range overlaps
-`source_pages` — the exact matching rule is a metrics.py implementation
-decision; blogs match on section only since they have no pages).
+and its section matches `source_sections` **or** its page range overlaps
+`source_pages` (blogs match on section only since they have no pages).
+
+**OR, not AND — decided, and it matters.** Page ranges come from PyMuPDF
+block metadata and are reliable. Section names come from ToC-to-block
+matching, which has a documented list of ways it can fail (see the table in
+"Ingestion" above). OR gives each label axis a fallback when the other
+misses. AND conjoins two things that can each fail independently and turns
+every labelling slip into a silent zero — and a silent zero doesn't look
+like a bug, it looks like a config that scored slightly worse.
+
+**Validate labels before embedding anything.** `tests/test_golden_labels.py`
+asserts every `source_sections` value in `golden.json` actually appears in
+emitted chunk metadata, with near-miss suggestions on failure. It should run
+at the top of `eval run` too, not only under pytest: chunk IDs aren't stable
+across chunk-parameter changes and section names aren't guaranteed stable if
+the heading logic changes, so a label that was correct during one sweep can
+rot by the next. Running it as a gate converts "quietly lower scores" into
+"the run refuses to start", which is the difference between a bug you find
+and one you don't.
 
 **hit-rate@k** (a.k.a. recall@k at question level): the fraction of golden
 questions where *at least one* of the top-k chunks is correct. Binary per
@@ -316,6 +381,45 @@ complementary, not summable:
 
 ---
 
+## Open question: evaluating quiz question quality
+
+Not handled by the current eval design, and it's a real gap, not a maybe.
+Raised by a friend while Stan was explaining the project: "how do you evaluate
+the model's ability to generate good quiz questions for new text?"
+
+Retrieval metrics (above) score whether search finds the right chunk. The
+LLM-judge scores whether a *generated answer* matches a hand-written reference.
+Both are checked against `golden.json`'s fixed, pre-written questions. Neither
+touches `quiz_me`, which generates *novel* questions on the fly from whatever
+chunks come back for a topic — there's no reference to compare a fresh
+question against, so nothing currently checks whether a generated quiz
+question is any good. `quiz_me` is core v1 (README) and currently has zero
+eval coverage — this belongs in scope now, not as a someday improvement.
+
+Three distinct failure modes, needing different checks:
+
+- **Ungrounded** — the question or its expected answer doesn't trace back to
+  the retrieved chunk; the model filled in from its own knowledge rather than
+  from what was retrieved.
+- **Trivial** — a fill-in-the-blank restating a sentence verbatim, testing
+  recall of wording rather than understanding.
+- **Wrong difficulty label** — tagged "easy" but actually needs synthesis
+  across the chunk, or vice versa.
+
+Two directions worth weighing when `judge.py` gets built (judge.py is Stan's
+per CLAUDE.md — this is a design note, not an implementation):
+
+1. Extend the LLM-as-judge pattern to questions: judge a generated question
+   against its source chunk for groundedness + non-triviality, reusing the
+   same Sonnet + structured-output infrastructure already planned for
+   answer grading — not net-new infrastructure, an additional judge prompt.
+2. Cheap human-in-the-loop signal: log a thumbs-up/down when a quiz is
+   actually taken. Consistent with how this project already treats ground
+   truth — hand-written golden set, hand-marked glossary terms — rather than
+   defaulting to auto-generated labels for something this subjective.
+
+---
+
 ## Ideas — parked, not built
 
 Written down so they aren't lost, not commitments. CLAUDE.md's "no new
@@ -323,13 +427,18 @@ features after Day 10" guardrail exists specifically to fight scope creep;
 these stay parked until retrieval.py + the eval harness (the actual
 differentiator per README) are done.
 
-**Glossary.** Reader marks a term while reading; the system resolves it
-against the corpus into a grounded, cited definition, splitting senses when
-the same term means different things in different documents (e.g.
-"embodiment" in a GAIA-3 post vs. in pi-0). Full design in
-`GLOSSARY_DESIGN.md`. The input side is already built — `glossary/terms.txt`,
-`roboscholar/glossary.py`, `rs glossary status` — resolution needs
-retrieval.py to exist first.
+**Glossary — dropped 2026-09-14, not parked.** The design was: mark unfamiliar
+terms in `glossary/terms.txt` while reading, then batch-resolve each one
+against the corpus into a grounded, cited definition, splitting senses where
+documents disagree (e.g. "embodiment" in GAIA-3 vs. in pi-0). Killed on
+Stan's call: the marking step is a second place to write things down, and
+the payoff is a separate term database he'd have to go back and read, which
+is work that doesn't pay for itself. The need it was meant to serve — "I hit
+an unfamiliar term mid-paper and want it explained" — is better served in the
+moment by highlight-to-ask below, which needs no marking step, no separate
+store, and grounds the explanation in the passage actually on screen rather
+than in a corpus-wide sense merge. `roboscholar/glossary.py` and
+`glossary/terms.txt` are left on disk, unwired and uncommitted.
 
 **Concept visualisation / simulation.** Floated 2026-09: for a concept like
 action chunking or temporal ensembling, generate a small visual or
@@ -339,3 +448,69 @@ cell?), generated on-demand per question or pre-built per concept, and
 whether "simulation" means an actual numeric simulation of the method or an
 illustrative animation — those are very different scopes and worth pinning
 down before any code gets written.
+
+First real data point, 2026-09: while writing `pi05-003`, Stan got stuck on
+the π0.5 policy-factorisation equation and asked for an on-demand walkthrough
+as an Artifact rather than a chat explanation — a persistent equation with
+terms that highlight/dim per step, a hover-synced symbol glossary, and a
+small flow diagram for the "why ℓ is dropped" insight. Confirmed as exactly
+the right shape ("this is exactly the sort we'd want to create in future for
+when I don't understand the math"). Answers two of the open questions above:
+on-demand (not pre-built) and per-question, not per-concept library. Doesn't
+resolve the "numeric simulation vs. illustrative diagram" question — this was
+firmly the latter, a notation walkthrough, not a simulation of anything
+computing. Practical note: LaTeX (`$$...$$`) doesn't render in the CLI
+terminal at all — chat replies with maths need plain notation, actual
+equations need an Artifact.
+
+**Browser highlight-to-ask.** Floated 2026-09: while reading a paper,
+highlight an equation or passage and ask the agent about it in place, rather
+than switching windows to paste it into a chat. Reference point was Benji's
+[agentation](https://benji.org/agentation), but the mechanism doesn't
+transfer directly — Agentation is a React component with DOM access to your
+*own* app: annotate an element, get its selector and bounding box, paste
+that into an agent. No vision model involved, because it never needs one; it
+always has structured access to the page it's embedded in. RoboScholar's
+target content is the opposite case — PDFs (no DOM at all) and arbitrary
+external blog pages (no control over their markup) — which is why this
+actually does need a screenshot-plus-vision path rather than DOM scraping,
+plus a way to tell the agent which corpus document is on screen so the
+answer grounds against that entry instead of answering cold. A real
+extension build (content script, screenshot capture, vision call), not a CLI
+feature, and a materially bigger scope than glossary or concept
+visualisation. Stays parked behind retrieval.py and the eval harness like
+the rest of this section.
+
+Update 2026-09: [Clicky](https://www.heyclicky.com/) is a closer precedent
+than Agentation — hotkey → full-screen screenshot → vision-capable frontier
+model → spoken/on-screen answer, no browser extension, no persistent
+screenshot storage, works identically across any app because it never
+touches the DOM at all. That sidesteps the PDF-has-no-DOM problem above
+entirely: the minimum build is a hotkey listener, a screenshot, and one
+vision-capable `messages.create` call (Claude and GPT-4o-class models take
+images natively, no separate VLM to source or host). What Clicky doesn't do
+is grounding — knowing which corpus document is on screen so the answer
+cites a retrieved chunk instead of the model's own reading of the pixels —
+which is the actual RoboScholar contribution, not the capture mechanism.
+
+Update 2026-09, second data point: while reading LeWorldModel, Stan hit
+"representation collapse" and wanted to highlight the term and get it
+explained *in the context of that specific sentence*, not a generic
+definition. This is the same feature, not a third idea — and it argues for
+the screenshot approach over pure text/DOM selection, because a screenshot
+captures the surrounding paragraph for free, which a bare highlighted string
+would lose. This use case is also what killed the glossary feature above —
+a single in-the-moment lookup grounded in what's on screen beats marking a
+term now to read a definition later.
+
+Also floated: a "highlight this, generate an artifact" mode extending the
+math-walkthrough pattern in [[feedback_math_walkthrough_artifacts]] to be
+on-demand rather than something Claude Code offers proactively. Correctly
+flagged as expensive — building the π0.5 artifact took real tool calls
+(source extraction, layout design, several hundred lines of HTML/CSS/JS),
+nothing like the cost of an ordinary `ask` call, so this should stay a
+deliberate, occasional action rather than a per-highlight default. On model
+choice: Sonnet built that artifact and it held up, so there's no evidence
+yet that Opus is required — default to Sonnet (same tier as the agent loop
+and judge) and only reconsider with real examples of Sonnet falling short on
+a harder equation, not pre-emptively.

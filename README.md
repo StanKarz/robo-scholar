@@ -57,7 +57,6 @@ roboscholar/
 ├── agent.py       # hand-written tool-use loop
 ├── tools.py       # search_corpus, compare_methods, quiz_me
 ├── models.py      # Pydantic schemas
-├── glossary.py    # parked-feature input side (see NOTES.md → Ideas)
 └── evals/         # golden.json, metrics.py, judge.py, runner.py
 data/raw/          # papers.json + blogs.json manifests, fetched corpus
 ```
@@ -66,5 +65,3 @@ data/raw/          # papers.json + blogs.json manifests, fetched corpus
 
 - `NOTES.md` — how the pipeline fits together, and why each decision was made
 - `CLAUDE.md` — working rules for Claude Code in this repo
-- `COMPREHENSION.md` — running personal notes on understanding this project
-- `GLOSSARY_DESIGN.md` — design for the parked glossary feature
