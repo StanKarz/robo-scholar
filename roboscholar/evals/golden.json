@@ -1,56 +1,387 @@
 {
   "version": 1,
-  "description": "Golden set for retrieval + answer-quality evals. Written by hand while reading each paper. Target: 25-30 entries. `source_paper` must match the paper_id used at ingest time; `source_sections`/`source_pages` are the ground-truth chunk locations for hit-rate@k and MRR.",
+  "description": "Golden set for retrieval + answer-quality evals. Written by hand while reading each paper. Target: 25-30 entries. `source_paper` must match the paper_id used at ingest time; `source_sections`/`source_pages` are the ground-truth chunk locations for hit-rate@k and MRR. NOTE: source_sections must EXACTLY equal the labels ingest emits - compound 'Parent › Child' form, ToC-qualified for PDFs (e.g. 'VI Ablations › VI-A Action Chunking and Temporal Ensembling'). Verified against emitted output 2026-07-31; tests/test_golden_labels.py enforces the match. ACT source_pages refer to the arXiv 2304.13705 PDF fetched by rs fetch (the RSS proceedings version paginates differently).",
   "questions": [
     {
-      "id": "act-001",
-      "question": "REPLACE ME: e.g. Why does ACT predict chunks of actions instead of single actions?",
-      "reference_answer": "REPLACE ME: 2-4 sentence hand-written answer, grounded in the paper.",
-      "source_paper": "act",
-      "source_sections": ["REPLACE ME: e.g. 'IV. Method'"],
-      "source_pages": [0],
+      "id": "dp-001",
+      "question": "What are some of the technical contributions from the paper that improve the performance of Diffusion Policy on physical robots?",
+      "reference_answer": "Closed-loop action sequences: the policy's capability to predict high-dimensional action sequences is combined with receding horizon control to achieve robot execution, allowing the policy to continuously replan its action in a closed-loop manner while maintaining temporal action consistency. This achieves a balance between long-horizon planning and responsiveness. Visual conditioning: a visually-conditioned diffusion policy is used, where the visual observations are treated as conditioning instead of a part of the joint data distribution. The policy extracts the visual representation once regardless of the denoising iterations, which significantly reduces computation and enables real-time action inference. Time-series diffusion transformer: a novel transformer-based diffusion network is used that minimises the over-smoothing effects of typical CNN-based models and achieves state-of-the-art performance on tasks that require high-frequency action changes and velocity control.",
+      "source_paper": "diffusion-policy",
+      "source_sections": ["1 Introduction"],
+      "source_pages": [1, 2],
       "difficulty": "easy",
-      "tags": ["action-chunking"]
+      "tags": ["overview", "architecture"]
     },
     {
-      "id": "dp-001",
-      "question": "REPLACE ME",
-      "reference_answer": "REPLACE ME",
+      "id": "dp-002",
+      "question": "How is a typical DDPM modified to learn robot visuomotor policies?",
+      "reference_answer": "Two modifications are made to the formulation: first, the output x is changed to represent robot actions; second, the denoising process is conditioned on input observations. For the action formulation to be effective it should encourage temporal consistency and smoothness in long-horizon planning while allowing prompt reactions to unexpected observations, so the policy commits to the action-sequence prediction produced by the diffusion model for a fixed duration before replanning.",
       "source_paper": "diffusion-policy",
-      "source_sections": [],
-      "source_pages": [],
+      "source_sections": [
+        "2 Diffusion Policy Formulation › 2.3 Diffusion for Visuomotor Policy Learning"
+      ],
+      "source_pages": [3],
       "difficulty": "medium",
-      "tags": []
+      "tags": ["diffusion", "formulation"]
+    },
+    {
+      "id": "dp-003",
+      "question": "What are some of the advantages of Diffusion Policy over other forms of policy representation?",
+      "reference_answer": "Diffusion policies are able to express multimodal distributions naturally and precisely. DDPM scales well with output dimensions without sacrificing the expressiveness of the model. Leveraging this, Diffusion Policy represents action in the form of a high-dimensional action sequence, which naturally addresses temporal action consistency and robustness to idle actions - problems that affect methods predicting actions independently step by step. Diffusion Policy is also more stable to train than implicit policies such as IBC, which suffer from training instability inherent to energy-based models.",
+      "source_paper": "diffusion-policy",
+      "source_sections": [
+        "4 Intriguing Properties of Diffusion Policy › 4.1 Model Multi-Modal Action Distributions",
+        "4 Intriguing Properties of Diffusion Policy › 4.3 Benefits of Action-Sequence Prediction",
+        "4 Intriguing Properties of Diffusion Policy › 4.4 Training Stability"
+      ],
+      "source_pages": [4, 6],
+      "difficulty": "medium",
+      "tags": ["diffusion", "multimodality", "action-sequence"]
     },
     {
       "id": "pi0-001",
-      "question": "REPLACE ME",
-      "reference_answer": "REPLACE ME",
+      "question": "What is the overall approach the researchers utilise for incorporating diverse data into the model?",
+      "reference_answer": "The first step is to use a pre-trained vision-language model (VLM) to import internet-scale experience, which means the model inherits the general knowledge, semantic reasoning and problem-solving abilities of language and vision-language models. The model is further trained to incorporate robot actions, turning it into a vision-language-action model (VLA). To make it feasible to use a variety of diverse robot data sources, cross-embodiment training is employed, where data from many robot types is combined into the same model. Each robot type has a different configuration space and action representation, including single-arm, dual-arm and mobile-manipulator systems. To perform highly dexterous and intricate physical tasks, an action chunking architecture is used with flow matching (a variant of diffusion) to represent continuous action distributions.",
       "source_paper": "pi-0",
-      "source_sections": [],
-      "source_pages": [],
+      "source_sections": ["Introduction"],
+      "source_pages": [2, 3],
+      "difficulty": "easy",
+      "tags": ["overview", "cross-embodiment", "flow-matching"]
+    },
+    {
+      "id": "pi0-002",
+      "question": "Describe the pre-training phase and why it is necessary.",
+      "reference_answer": "The pre-training phase uses diverse language labels, combining task names and segment annotations (fine-grained labels for sub-trajectories, typically about 2 seconds in length). The purpose of the pre-training phase is to train a base model that exhibits broad capabilities and generalisation, but is not necessarily specialised for high performance on any one task. The base model can follow language commands and perform a variety of tasks at rudimentary proficiency.",
+      "source_paper": "pi-0",
+      "source_sections": ["Overview"],
+      "source_pages": [4],
       "difficulty": "medium",
-      "tags": []
+      "tags": ["pre-training", "training-recipe"]
+    },
+    {
+      "id": "pi0-003",
+      "question": "What does the π0 model consist of?",
+      "reference_answer": "It consists primarily of a language model transformer backbone. Image encoders embed the robot's image observations into the same embedding space as language tokens, and the backbone is further augmented with robotics-specific inputs and outputs, namely proprioceptive state and robot actions. π0 uses conditional flow matching to model the continuous distribution of actions, which gives the model precision and multimodal modelling capability, making it well suited to high-frequency dexterous tasks. The architecture is inspired by Transfusion, which trains a single transformer using multiple objectives: tokens corresponding to continuous outputs are supervised via a flow matching loss, and tokens corresponding to discrete outputs are supervised via a cross-entropy loss. Building on Transfusion, using a separate set of weights for the robotics-specific (action and state) tokens led to an improvement in performance. This design is analogous to a mixture of experts with two elements, where the first is used for image and text inputs and the second is used for robotics-specific inputs and outputs.",
+      "source_paper": "pi-0",
+      "source_sections": ["The 0 Model"],
+      "source_pages": [4, 5],
+      "difficulty": "medium",
+      "tags": ["architecture", "flow-matching"]
     },
     {
       "id": "pi05-001",
-      "question": "REPLACE ME",
-      "reference_answer": "REPLACE ME",
+      "question": "What is the main contribution of the authors?",
+      "reference_answer": "A system for training a highly generalisable VLA, combined with a proof of concept that generalisation can emerge from this model when trained on appropriately diverse data. The work demonstrates an end-to-end learning-enabled robotic system that can perform long-horizon and dexterous manipulation skills, e.g. cleaning a kitchen or bedroom, in never-seen-before environments (new homes). This is achieved by transferring knowledge from multiple heterogeneous sources including other robots, high-level semantic prediction, verbal language instruction from human supervisors, web data and other sources.",
       "source_paper": "pi-0.5",
-      "source_sections": [],
-      "source_pages": [],
+      "source_sections": ["Introduction"],
+      "source_pages": [3],
+      "difficulty": "easy",
+      "tags": ["overview", "generalization"]
+    },
+    {
+      "id": "pi05-003",
+      "question": "Describe the π0.5 architecture.",
+      "reference_answer": "The π0.5 architecture is flexible in the sense that it can represent both action chunk distributions and tokenised text outputs, with the latter used for co-training tasks (e.g. question-answering) and for outputting high-level subtask predictions during hierarchical inference. Essentially, π0.5 predicts a subtask before it predicts a motion, using the same transformer for both. An observation consists of images from every camera plus the robot's own proprioceptive state: joint angles, gripper pose, torso lift and base velocity. The task prompt is the instruction a person actually gives it, e.g. 'clean up the spill' - this stays fixed for the whole episode, the model doesn't get to redefine it. The predicted text is text the model generates itself, typically the immediate subtask, e.g. 'pick up the sponge'; during co-training this slot can also be the answer to a web VQA-style prompt. The action chunk is the sequence of H future low-level actions - joint or end-effector targets - that the robot actually executes. The weights are one shared set of transformer parameters used throughout. Before any splitting happens, the model represents the probability of producing an action chunk and a subtask prediction together, given what it currently sees and the task it's been given. This factorises into a high-level policy, which decides what the immediate subtask is, and a low-level policy, which - given what it sees and the subtask just decided - determines what motion to execute. The low-level term never conditions on the task prompt directly, only on the predicted subtask, so the model has no path straight from 'clean up the spill' to a motor command: every action has to be justified by a subtask generated first.",
+      "source_paper": "pi-0.5",
+      "source_sections": [
+        "The 0.5 Model and Training Recipe › The 0.5 architecture"
+      ],
+      "source_pages": [5],
       "difficulty": "hard",
-      "tags": []
+      "tags": ["architecture", "hierarchical", "flow-matching"]
+    },
+    {
+      "id": "pi05-002",
+      "question": "What is the purpose of post-training in this case?",
+      "reference_answer": "After the usual training, a second stage of training is performed, referred to as post-training. The goal is to specialise the model to the use case of mobile manipulation in homes and to add an action expert that can produce action chunks via flow matching. This stage jointly trains with next-token prediction to preserve text prediction capabilities, and flow matching for the action expert (initialised with random weights at the beginning of post-training).",
+      "source_paper": "pi-0.5",
+      "source_sections": [
+        "The 0.5 Model and Training Recipe › Post-training"
+      ],
+      "source_pages": [7],
+      "difficulty": "medium",
+      "tags": ["post-training", "training-recipe", "flow-matching"]
+    },
+    {
+      "id": "act-001",
+      "question": "What makes fine manipulation tasks difficult for robots?",
+      "reference_answer": "Fine manipulation involves precise, closed-loop feedback and high degrees of hand-eye coordination to adjust and re-plan as the environment changes. The operations are delicate ones like pinching, prying and tearing rather than broad-stroke picking and placing. Opening a condiment cup lid requires tipping it over, nudging it into the other gripper, then prying the lid open from below. Each step demands high precision, delicate coordination and rich contact, and millimetres of error lead to task failure.",
+      "source_paper": "act",
+      "source_sections": ["I Introduction"],
+      "source_pages": [1, 2],
+      "difficulty": "easy",
+      "tags": ["fine-manipulation", "motivation"]
+    },
+    {
+      "id": "act-002",
+      "question": "What are the components of the ACT algorithm, and what problem is each one solving?",
+      "reference_answer": "Small errors in a predicted action cause large differences in state, which exacerbates the compounding error problem of imitation learning. ACT addresses this with action chunking, taken from a psychology concept where sequences of actions are grouped and executed as one unit, so the policy predicts target joint positions for the next k timesteps rather than one step at a time. This reduces the effective horizon of the task k-fold. Chunking also handles temporally correlated confounders such as pauses in demonstrations, which Markovian single-step policies struggle with. Temporal ensembling then improves smoothness by querying the policy more frequently and averaging overlapping chunks, and the whole method is implemented with Transformers and trained as a conditional VAE to capture variability in human data.",
+      "source_paper": "act",
+      "source_sections": ["I Introduction"],
+      "source_pages": [1, 2],
+      "difficulty": "medium",
+      "tags": ["action-chunking", "overview"]
+    },
+    {
+      "id": "act-003",
+      "question": "What is recorded as the action when training ACT, and why that signal rather than the alternative?",
+      "reference_answer": "Human demonstrations are collected with ALOHA, and the joint positions of the leader robots, meaning the human operator's input, are recorded as the actions. Using leader rather than follower positions matters because the force applied is implicitly defined by the difference between the two, through the low-level PID controller. Observations are the current joint positions of the follower robots plus the image feed from 4 cameras, and ACT is trained to predict the sequence of future actions given the current observations, where an action is the target joint positions for both arms at the next timestep. At test time the policy with the lowest validation loss is loaded and rolled out.",
+      "source_paper": "act",
+      "source_sections": ["IV Action Chunking with Transformers"],
+      "source_pages": [4],
+      "difficulty": "medium",
+      "tags": ["data-collection", "aloha"]
+    },
+    {
+      "id": "act-004",
+      "question": "How does action chunking help with non-Markovian behaviour in human demonstrations?",
+      "reference_answer": "A single-step policy struggles with temporally correlated confounders, such as pauses in the middle of a demonstration, because the behaviour depends not only on the state but also on the timestep, so the pause is not predictable from the state alone. Action chunking mitigates this when the confounder falls within a chunk, and it does so without introducing the causal confusion issue that affects history-conditioned policies.",
+      "source_paper": "act",
+      "source_sections": [
+        "IV Action Chunking with Transformers › IV-A Action Chunking and Temporal Ensemble"
+      ],
+      "source_pages": [4, 5],
+      "difficulty": "hard",
+      "tags": ["action-chunking", "confounders", "non-markovian"]
+    },
+    {
+      "id": "act-005",
+      "question": "What is temporal ensembling, and how does it differ from ordinary smoothing?",
+      "reference_answer": "A naive implementation of action chunking incorporates a new observation abruptly every k steps, which produces jerky robot motion. Temporal ensembling instead queries the policy at every timestep, so action chunks overlap and more than one predicted action exists for a given timestep. These predictions are combined by weighted average with an exponential scheme w_i = exp(-m*i), where w_0 is the weight for the oldest action, and the speed of incorporating new observations is governed by m, with a smaller m meaning faster incorporation. Unlike typical smoothing, which aggregates the current action with actions at adjacent timesteps and so introduces bias, this aggregates actions predicted for the same timestep. It incurs no additional training cost, only extra inference-time computation.",
+      "source_paper": "act",
+      "source_sections": [
+        "IV Action Chunking with Transformers › IV-A Action Chunking and Temporal Ensemble"
+      ],
+      "source_pages": [4, 5],
+      "difficulty": "hard",
+      "tags": ["temporal-ensembling"]
+    },
+    {
+      "id": "act-006",
+      "question": "Why is ACT trained as a conditional VAE, and what role does the style variable play?",
+      "reference_answer": "Human demonstrations are noisy: given the same observation a human may take different trajectories, and they are more stochastic in regions where precision matters less. Training the policy as a CVAE lets it focus on the regions where precision does matter. The CVAE encoder predicts the mean and variance of a style variable z given the current joint positions and the action sequence (image observations are left out of the encoder input), and exists only to train the decoder, being discarded at test time. The decoder, which is the policy, conditions on both z and the current observations to predict the action sequence. Training maximises the log-likelihood of demonstration action chunks with the standard VAE objective, a reconstruction loss plus a KL term regularising the encoder toward a Gaussian prior, weighted by beta. At test time z is set to the mean of the prior, zero, so decoding is deterministic.",
+      "source_paper": "act",
+      "source_sections": [
+        "IV Action Chunking with Transformers › IV-B Modeling human data"
+      ],
+      "source_pages": [5],
+      "difficulty": "hard",
+      "tags": ["cvae", "multimodality"]
+    },
+    {
+      "id": "act-007",
+      "question": "How is ACT implemented architecturally?",
+      "reference_answer": "The CVAE encoder is a BERT-like transformer encoder taking current joint positions and a length-k target action sequence prepended with a learned [CLS] token; the [CLS] output predicts the mean and variance of z. The decoder, which is the policy, uses ResNet18 image backbones, a transformer encoder and a transformer decoder. Each 480x640x3 image becomes a 15x20x512 feature map, flattened to 300x512 with a 2D sinusoidal position embedding added, giving 1200x512 across 4 cameras, plus projected joint positions and z for a 1202x512 encoder input. The transformer decoder cross-attends to the encoder output with a fixed k x 512 position embedding as queries, and an MLP down-projects to k x 14 target joint positions. L1 reconstruction loss is used rather than L2 because it models the action sequence more precisely.",
+      "source_paper": "act",
+      "source_sections": [
+        "IV Action Chunking with Transformers › IV-C Implementing ACT"
+      ],
+      "source_pages": [5, 6],
+      "difficulty": "hard",
+      "tags": ["architecture", "transformers"]
+    },
+    {
+      "id": "act-008",
+      "question": "Why does ALOHA use joint-space mapping rather than task-space mapping for teleoperation?",
+      "reference_answer": "The user backdrives a smaller WidowX leader robot whose joints are synchronised with the larger ViperX follower, rather than mapping a VR controller or camera hand pose to the robot's end-effector. Two benefits emerged. Fine manipulation often operates near the singularities of a 6-DoF arm with no redundancy, where off-the-shelf inverse kinematics fails frequently, whereas joint-space mapping guarantees high-bandwidth control within joint limits with less computation and lower latency. The weight of the leader robot also stops the user moving too fast and damps small vibrations. Performance on precise tasks was better than holding a VR controller.",
+      "source_paper": "act",
+      "source_sections": [
+        "III ALOHA: A Low-cost Open-source Hardware System for Bimanual Teleoperation"
+      ],
+      "source_pages": [3, 4],
+      "difficulty": "medium",
+      "tags": ["aloha", "teleoperation", "hardware"]
+    },
+    {
+      "id": "act-009",
+      "question": "What does varying the chunk size k reveal about action chunking?",
+      "reference_answer": "k = 1 corresponds to no chunking and k = episode_length to fully open-loop control, where the whole episode is emitted from the first observation. With temporal ensembling disabled and separate policies trained per k, success averaged over four settings rises sharply from 1% at k = 1 to 44% at k = 100, then tapers slightly at higher k. The dip near open-loop control is attributed to the lack of reactive behaviour and the difficulty of modelling long action sequences. Augmenting BC-ConvMLP and VINN with chunking shows the same trend, which suggests chunking is generally beneficial rather than specific to ACT.",
+      "source_paper": "act",
+      "source_sections": [
+        "VI Ablations › VI-A Action Chunking and Temporal Ensembling"
+      ],
+      "source_pages": [9],
+      "difficulty": "medium",
+      "tags": ["ablation", "action-chunking"]
+    },
+    {
+      "id": "act-010",
+      "question": "What does the CVAE ablation show about when the objective matters?",
+      "reference_answer": "Removing the CVAE objective, so that the model simply predicts an action sequence from the current observation and trains with L1 loss, makes almost no difference on scripted data, because that dataset is fully deterministic. On human data, success drops sharply from 35.3% to 2%. The objective is therefore crucial specifically for learning from human demonstrations, where the multi-modality is real.",
+      "source_paper": "act",
+      "source_sections": ["VI Ablations › VI-B Training with CVAE"],
+      "source_pages": [9, 10],
+      "difficulty": "medium",
+      "tags": ["ablation", "cvae"]
+    },
+    {
+      "id": "wm-001",
+      "question": "Describe how the learning algorithm works.",
+      "reference_answer": "Dreamer (the third generation of the algorithm) is built from three neural networks working together: a world model that predicts what will happen after a given action, a critic that scores how valuable each predicted outcome is, and an actor that picks actions aimed at the most valuable outcomes. All three train at the same time, using experience replayed from the agent's ongoing interaction with the environment. Getting this to work across very different domains is non-trivial, because each of the three networks deals with signals of very different magnitude and has to keep the terms in its own objective balanced without per-domain tuning.",
+      "source_paper": "world-models",
+      "source_sections": ["Learning algorithm"],
+      "source_pages": [3],
+      "difficulty": "easy",
+      "tags": ["overview", "dreamer", "architecture"]
+    },
+    {
+      "id": "wm-002",
+      "question": "How is the world model structured, and how do the actor and critic learn from it?",
+      "reference_answer": "The world model is implemented as an RSSM (Recurrent State-Space Model). It learns compact representations of sensory input through autoencoding: an encoder first maps each observation to a stochastic representation, then a sequence model with a recurrent hidden state predicts the sequence of those representations forward, conditioned on past actions. Concatenating the recurrent state and the representation gives the model state used everywhere else, which lets the model roll forward in imagination - predicting future representations, rewards and episode-continuation flags for a hypothesised sequence of actions.\n\nThe actor and critic then learn entirely from these imagined trajectories rather than the real environment: given a batch of replayed experience, the world model and actor jointly generate a rollout of imagined model states, actions, rewards and continuation flags, and the actor/critic pair trains on that rollout. At environment interaction time, actions are simply sampled from the actor with no lookahead search. Because both operate on the model state rather than raw observations, they inherit the Markovian structure the recurrent world model already learned.\n\nThe actor aims to maximise the discounted return - not just the immediate reward - for each model state, using a discount factor of gamma = 0.997. Because imagined rollouts only extend 16 steps, the critic's job is to estimate the value of returns beyond that horizon: it approximates the full distribution of returns under the current actor's behaviour, rather than predicting a single expected value. To get a return estimate for training, bootstrapped lambda-returns are computed by combining the predicted rewards along the rollout with the critic's own value estimates, read out as the expectation of its predicted distribution. The critic is then trained to predict the distribution of these lambda-return targets by maximum likelihood.",
+      "source_paper": "world-models",
+      "source_sections": [
+        "Learning algorithm › World model learning",
+        "Learning algorithm › Critic learning"
+      ],
+      "source_pages": [3, 6],
+      "difficulty": "hard",
+      "tags": ["rssm", "actor-critic", "dreamer"]
     },
     {
       "id": "gaia1-001",
-      "question": "REPLACE ME: blog entry — no pages, metrics match on section only",
-      "reference_answer": "REPLACE ME",
+      "question": "How can we define a world model and what is their significance in autonomous driving?",
+      "reference_answer": "Humans and animals build up world models simply by observing and interacting with their surroundings, accumulating experience that lets them handle situations they haven't specifically encountered before. This predictive capacity is what autonomous driving depends on: a world model gives a driving system something like an internal simulator, a way to run a 'what happens if' check before committing to an action, which is the basis of model-based RL and planning. Folding a world model into a driving stack means the system can read human driving decisions more accurately and transfer that understanding to situations it hasn't seen in training.",
       "source_paper": "introducing-gaia1",
-      "source_sections": ["REPLACE ME: e.g. 'What is a world model?'"],
+      "source_sections": ["What is a world model?"],
       "source_pages": [],
       "difficulty": "easy",
-      "tags": ["world-models", "blog"]
+      "tags": ["world-models", "definition", "blog"]
+    },
+    {
+      "id": "gaia1-002",
+      "question": "What are some of the key capabilities of GAIA-1 and why are they relevant in autonomous driving?",
+      "reference_answer": "It can extend a few seconds of video into several minutes of plausible future driving footage; treating the earliest frames of the prompt as decreasingly important the further it generates suggests it has picked up the underlying structure of driving scenes rather than just memorising short clips. Given the same starting footage, it can also branch into several different plausible continuations rather than one fixed outcome, evidence that it is modelling a distribution over what could happen next. Video or natural-language prompts can steer the generation, giving control over both the scene and the ego vehicle's behaviour - the more interesting case is pushing GAIA-1 into scenarios absent from training, such as forcing an incorrect steering manoeuvre, and having it still produce a coherent result. That extrapolation matters directly for safety evaluation: the crashes and near-misses that matter most for validating driving systems are exactly the ones too rare or too dangerous to collect by testing in the real world, so a model that can plausibly imagine them is a genuinely safer route to that evaluation.",
+      "source_paper": "introducing-gaia1",
+      "source_sections": ["Emerging Capabilities of GAIA-1"],
+      "source_pages": [],
+      "difficulty": "medium",
+      "tags": ["capabilities", "extrapolation", "safety-critical", "blog"]
+    },
+    {
+      "id": "gaia2-001",
+      "question": "What are some of the key changes made in GAIA-2 relative to GAIA-1?",
+      "reference_answer": "GAIA-2 allows for a broader scope of control, enabling fine-grained scenario customisation. GAIA-1 had limited conditioning capabilities, whereas GAIA-2 supports multiple geographies (UK, US, Germany), enabling region-specific data generation that accelerates the adaptation of AI driving models to new driving domains. It also introduces native multi-camera video generation, ensuring spatial and temporal coherence across different viewpoints - an essential capability for learning robust driving policies from multi-view data. GAIA-2 further develops a more comprehensive set of domain-specific parameters, allowing researchers to modify weather conditions, road attributes, traffic dynamics and agent behaviours with improved precision. This makes GAIA-2 a more powerful tool for targeted scenario generation, whether for training driving models, augmenting real-world datasets, or stress-testing AI driving systems against rare but safety-critical edge cases.",
+      "source_paper": "gaia-2",
+      "source_sections": [
+        "Advancing from GAIA-1 to GAIA-2: Greater Control, Realism, and Scalability"
+      ],
+      "source_pages": [],
+      "difficulty": "easy",
+      "tags": ["gaia-1", "gaia-2", "comparison", "blog"]
+    },
+    {
+      "id": "gaia2-002",
+      "question": "Describe some of the key architectural aspects of the GAIA-2 model and its training.",
+      "reference_answer": "GAIA-2 consists of a video tokeniser and a latent diffusion world model, which work in tandem to generate high-fidelity simulations. The video tokeniser compresses raw pixels into a compact and semantically meaningful latent space, enabling efficient representation of driving dynamics while preserving essential information. The latent diffusion model then predicts future latent states based on past observations, ego-vehicle actions (speed, curvature etc.), dynamic agent behaviours (based on 3D bounding boxes), environmental factors (weather, time of day), and road attributes (number of lanes, speed limits, cycle and bus lanes, zebra crossings, intersections, traffic lights). GAIA-2 also allows for latent conditioning from external models, including CLIP embeddings and a proprietary model optimised for driving, enhancing its adaptability for diverse synthetic applications - allowing it to operate in different generative modes: forecasting future frames, synthesising entirely new scenes, or modifying existing video sequences.",
+      "source_paper": "gaia-2",
+      "source_sections": ["Model Architecture and Training"],
+      "source_pages": [],
+      "difficulty": "medium",
+      "tags": ["architecture", "tokenizer", "blog"]
+    },
+    {
+      "id": "gaia2-003",
+      "question": "How does GAIA-2 improve safety and validation?",
+      "reference_answer": "Through diverse video generation, GAIA-2 unlocks a new level of scenario diversity by dynamically adapting to varied geographic, temporal and environmental conditions - a critical requirement for robust validation. GAIA-2 is capable of synthesising driving scenes across multiple countries, times of day, weather conditions and road types. Beyond this geographic diversity, GAIA-2 enables effortless modulation of time of day and weather conditions, allowing scenarios to seamlessly transition between dawn, midday and night, and supports smooth adaptation across urban, suburban and highway environments. By generating realistic, diverse and precisely controlled scenarios, GAIA-2 reduces reliance on extensive, location-specific real-world data collection. This speeds up testing and validation workflows and helps AI driving systems generalise across regions, adapt to domain shifts effectively, and perform reliably in both routine and edge-case scenarios.",
+      "source_paper": "gaia-2",
+      "source_sections": [
+        "Advancing Safety and Validation through Synthetic Scenarios › Diverse Video Generation"
+      ],
+      "source_pages": [],
+      "difficulty": "easy",
+      "tags": ["evaluation", "safety-critical", "blog"]
+    },
+    {
+      "id": "gaia3-001",
+      "question": "Why is real-world testing alone insufficient for evaluating autonomous driving systems at scale?",
+      "reference_answer": "Real-world testing is essential for proving safety, but it is costly, logistically constrained and increasingly data-inefficient. As driving models improve and make fewer observable mistakes, the number of miles needed for statistically meaningful conclusions rises sharply. Most of those miles are uneventful and offer little signal about rare, safety-critical behaviour.",
+      "source_paper": "gaia-3",
+      "source_sections": [
+        "GAIA-3: Scaling World Models to Power Safety and Evaluation"
+      ],
+      "source_pages": [],
+      "difficulty": "easy",
+      "tags": ["evaluation", "blog"]
+    },
+    {
+      "id": "gaia3-003",
+      "question": "Why do existing simulation approaches fall short for evaluating modern end-to-end driving systems?",
+      "reference_answer": "The two established families each miss one requirement. Procedural simulators, the long-standing standard for autonomy testing, allow precise control but lack realism. 3D reconstruction-based simulators achieve greater realism but struggle with occlusions and dynamic agents. Neither therefore enables meaningful evaluation of end-to-end systems.",
+      "source_paper": "gaia-3",
+      "source_sections": [
+        "GAIA-3: Scaling World Models to Power Safety and Evaluation"
+      ],
+      "source_pages": [],
+      "difficulty": "medium",
+      "tags": ["simulation", "blog"]
+    },
+    {
+      "id": "gaia3-004",
+      "question": "How does GAIA-3's world-on-rails approach change what evaluation can be used for?",
+      "reference_answer": "GAIA-3 combines the realism of real-world data with the control of simulation: authentic driving sequences can be re-driven with precise, parameterised variations - altering the ego vehicle's trajectory while every other element of the scene stays perfectly consistent, with other agents keeping their motion and lighting and weather unchanged. Operating in this world-on-rails way turns evaluation from reactive measurement into proactive exploration of the edge cases that define safety, and the scenes produced are not only lifelike but structured and purposeful.",
+      "source_paper": "gaia-3",
+      "source_sections": [
+        "GAIA-3: Scaling World Models to Power Safety and Evaluation"
+      ],
+      "source_pages": [],
+      "difficulty": "medium",
+      "tags": ["counterfactuals", "world-on-rails", "blog"]
+    },
+    {
+      "id": "gaia3-005",
+      "question": "How does GAIA-3 overcome the limitations of test-track experiments for safety-critical evaluation?",
+      "reference_answer": "Real safety-critical events - collisions, near-misses, loss-of-control - are rare, unpredictable and far too dangerous to stage, so the industry leans on controlled test-track experiments such as NCAP (New Car Assessment Program) tests with staged actors and dummy vehicles. Those offer precision but sacrifice realism and scalability: they cannot capture the visual richness, behavioural diversity or environmental complexity of real driving, so they risk giving an incomplete picture of real-world safety performance. GAIA-3 generates NCAP-style tests virtually and at scale instead, holding vehicle trajectories and timing consistent while background, lighting and scene dynamics vary, and the resulting crash and near-crash scenarios can be scored with the same occupancy and trajectory metrics already applied to real-world data.",
+      "source_paper": "gaia-3",
+      "source_sections": [
+        "Safety and Evaluation with GAIA-3 › Safety-critical scenarios"
+      ],
+      "source_pages": [],
+      "difficulty": "medium",
+      "tags": ["safety-critical", "ncap", "counterfactuals", "blog"]
+    },
+    {
+      "id": "gaia3-006",
+      "question": "How is the scene consistency of GAIA-3's safety-critical generations validated?",
+      "reference_answer": "Real-world sequences captured with LiDAR are used as the source, and the ego vehicle's trajectory is modified to produce collisions with scene objects. The LiDAR point clouds from the original recordings are then aligned with the generated frames and checked for misalignments and inconsistencies. This confirms that GAIA-3 preserves spatial structure and realism even when synthesising safety-critical scenarios.",
+      "source_paper": "gaia-3",
+      "source_sections": [
+        "Safety and Evaluation with GAIA-3 › Safety-critical scenarios"
+      ],
+      "source_pages": [],
+      "difficulty": "hard",
+      "tags": ["safety-critical", "validation", "lidar", "blog"]
+    },
+    {
+      "id": "gaia3-007",
+      "question": "How does GAIA-3 build offline evaluation suites from a single recorded driving sequence?",
+      "reference_answer": "The ego vehicle's behaviour is conditioned through action conditioning, optionally combined with World-on-Rails perturbations, to generate controlled variations of a real scenario. From one recorded sequence an entire family of 'what-ifs' can be created by adjusting parameters - an abrupt stop, a late merge, a pedestrian stepping into the road. These perturbations allow quantitative testing of a model's ability to recover from edge cases or maintain stability as conditions change.",
+      "source_paper": "gaia-3",
+      "source_sections": [
+        "Safety and Evaluation with GAIA-3 › Offline Evaluation Suites"
+      ],
+      "source_pages": [],
+      "difficulty": "medium",
+      "tags": ["offline-eval", "action-conditioning", "world-on-rails", "blog"]
+    },
+    {
+      "id": "gaia3-008",
+      "question": "What scale does GAIA-3 operate at, and what was it trained on?",
+      "reference_answer": "GAIA-3 is a 15-billion-parameter latent diffusion-based world model built for scalable, realistic and controllable offline evaluation. It was trained using five times more compute than GAIA-2 and on roughly ten times more data, spanning 9 countries across 3 continents. The dataset deliberately emphasises safety-critical scene elements such as pedestrians, cyclists, signs and traffic control infrastructure.",
+      "source_paper": "gaia-3",
+      "source_sections": ["Improved Capabilities through Scale"],
+      "source_pages": [],
+      "difficulty": "easy",
+      "tags": ["scaling", "architecture", "blog"]
+    },
+    {
+      "id": "gaia3-009",
+      "question": "What change accounts for GAIA-3's fidelity gains over GAIA-2?",
+      "reference_answer": "GAIA-3 doubles the model size of GAIA-2, and at the heart of that scale-up is a new video tokenizer twice the size of GAIA-2's. It captures safety-critical spatial and temporal structures, from subtle pedestrian motion to fast-moving vehicles, road signs and traffic lights. By encoding fine-grained spatio-temporal context it represents the physical and causal structure of real-world driving more faithfully, producing higher-fidelity video with sharper visuals, more consistent lighting and richer texture detail.",
+      "source_paper": "gaia-3",
+      "source_sections": ["Comparison between GAIA-2 and GAIA-3"],
+      "source_pages": [],
+      "difficulty": "medium",
+      "tags": ["architecture", "tokenizer", "blog"]
     }
   ]
 }
