@@ -1,111 +1,130 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 800" width="1000" height="800" role="img" aria-label="One rs ask question through the agent loop: your code calls Claude, Claude replies with a tool request, your code runs search_corpus against Chroma and sends the chunks back, repeated until Claude replies with end_turn and a cited answer.">
-  <title>Inside the agent loop: one rs ask question</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 900" width="1000" height="900" role="img" aria-label="The agent loop as a cycle: your code calls Claude, Claude either asks for a search or answers, your code runs the search and appends the request and the results to the message list, then calls Claude again. The list grows by two messages per lap until Claude answers.">
+  <title>The agent loop: one rs ask question</title>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#59636e"/>
+    </marker>
+    <marker id="arrow-loop" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2e7d4f"/>
     </marker>
   </defs>
   <style>
     text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #1f2328; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .h { font-size: 19px; font-weight: 700; }
+    .h2 { font-size: 15px; font-weight: 700; }
     .sub { font-size: 12.5px; fill: #59636e; }
-    .bt { font-size: 13px; font-weight: 600; }
-    .bs { font-size: 10.5px; fill: #59636e; }
-    .lab { font-size: 11.5px; }
-    .lab2 { font-size: 10.5px; fill: #59636e; }
-    .note { font-size: 11.5px; fill: #59636e; }
-    .num { font-size: 11px; font-weight: 700; fill: #ffffff; }
+    .bt { font-size: 13.5px; font-weight: 600; }
+    .bs { font-size: 11px; fill: #59636e; }
+    .lab { font-size: 11.5px; fill: #59636e; }
+    .blk { font-size: 10.5px; }
     .flow { stroke: #59636e; stroke-width: 1.5; fill: none; }
-    .life { stroke: #8c959f; stroke-width: 1; stroke-dasharray: 3 4; }
-    .loop { stroke: #2e7d4f; stroke-width: 1.2; fill: #f1f7f3; stroke-dasharray: 6 4; }
-    .ak { stroke: #2e7d4f; stroke-width: 1.5; fill: #ffffff; }
-    .cl { stroke: #59636e; stroke-width: 1.5; fill: #ffffff; }
-    .db { stroke: #6b4fa8; stroke-width: 1.5; fill: #f3effa; }
-    .dot { fill: #2e7d4f; }
+    .loop { stroke: #2e7d4f; stroke-width: 2.5; fill: none; }
+    .you { stroke: #2e7d4f; stroke-width: 1.5; fill: #ffffff; }
+    .claude { stroke: #59636e; stroke-width: 1.5; fill: #ffffff; }
+    .tool { stroke: #6b4fa8; stroke-width: 1.5; fill: #f3effa; }
+    .m-q { stroke: #2e7d4f; stroke-width: 1; fill: #e9f3ed; }
+    .m-tu { stroke: #59636e; stroke-width: 1; fill: #f1f1f2; }
+    .m-tr { stroke: #6b4fa8; stroke-width: 1; fill: #f3effa; }
   </style>
 
-  <rect x="0" y="0" width="1000" height="800" rx="14" fill="#fcfbf8"/>
+  <rect x="0" y="0" width="1000" height="900" rx="14" fill="#fcfbf8"/>
 
-  <text x="30" y="42" class="h">Inside the agent loop: one rs ask question</text>
-  <text x="30" y="64" class="sub">"What is temporal ensembling in ACT, and how much does it help?" Claude never touches Chroma: it asks, your code searches.</text>
-  <text x="30" y="81" class="sub">The API keeps no memory between calls, so every call resends the whole message list, which grows by two messages per search.</text>
+  <text x="30" y="42" class="h">The agent loop: one rs ask question</text>
+  <text x="30" y="64" class="sub">Claude never touches Chroma. It asks for a search; your code runs it and sends the results back.</text>
+  <text x="30" y="81" class="sub">The API remembers nothing between calls, so every lap resends the whole message list, two messages longer each time.</text>
 
-  <!-- Loop region (drawn first so lifelines sit on top) -->
-  <rect x="62" y="226" width="918" height="414" rx="10" class="loop"/>
-  <text x="76" y="246" class="lab mono" fill="#2e7d4f" font-weight="600">loop: while stop_reason == "tool_use"</text>
+  <!-- Legend -->
+  <rect x="720" y="120" width="22" height="13" rx="3" class="you"/>
+  <text x="750" y="131" class="lab">your code (agent.py)</text>
+  <rect x="720" y="143" width="22" height="13" rx="3" class="claude"/>
+  <text x="750" y="154" class="lab">Claude API</text>
+  <rect x="720" y="166" width="22" height="13" rx="3" class="tool"/>
+  <text x="750" y="177" class="lab">search_corpus → rank_chunks → Chroma</text>
 
-  <!-- Lane headers -->
-  <rect x="90" y="104" width="160" height="46" rx="8" class="ak"/>
-  <text x="170" y="124" class="bt" text-anchor="middle">agent.py</text>
-  <text x="170" y="140" class="bs" text-anchor="middle">your code: the loop</text>
+  <!-- Entry -->
+  <rect x="250" y="106" width="160" height="40" rx="20" class="you"/>
+  <text x="330" y="124" class="bt" text-anchor="middle">Question</text>
+  <text x="330" y="139" class="bs mono" text-anchor="middle">rs ask "…"</text>
+  <line x1="330" y1="146" x2="330" y2="177" class="flow" marker-end="url(#arrow)"/>
 
-  <rect x="420" y="104" width="160" height="46" rx="8" class="cl"/>
-  <text x="500" y="124" class="bt" text-anchor="middle">Claude API</text>
-  <text x="500" y="140" class="bs mono" text-anchor="middle">messages.create</text>
+  <!-- The loop: four stations, clockwise -->
+  <path d="M442,210 Q520,210 520,366" class="loop" marker-end="url(#arrow-loop)"/>
+  <path d="M520,434 Q520,590 447,590" class="loop" marker-end="url(#arrow-loop)"/>
+  <path d="M213,590 Q140,590 140,434" class="loop" marker-end="url(#arrow-loop)"/>
+  <path d="M140,366 Q140,210 218,210" class="loop" marker-end="url(#arrow-loop)"/>
 
-  <rect x="685" y="104" width="230" height="46" rx="8" class="db"/>
-  <text x="800" y="124" class="bt mono" text-anchor="middle">search_corpus</text>
-  <text x="800" y="140" class="bs mono" text-anchor="middle">tools.py → rank_chunks → Chroma</text>
+  <rect x="220" y="180" width="220" height="60" rx="8" class="you"/>
+  <text x="330" y="205" class="bt" text-anchor="middle">1  Call Claude</text>
+  <text x="330" y="223" class="bs" text-anchor="middle">send the whole message list</text>
 
-  <!-- Lifelines -->
-  <line x1="170" y1="150" x2="170" y2="730" class="life"/>
-  <line x1="500" y1="150" x2="500" y2="730" class="life"/>
-  <line x1="800" y1="150" x2="800" y2="730" class="life"/>
+  <rect x="425" y="368" width="190" height="64" rx="8" class="claude"/>
+  <text x="520" y="394" class="bt" text-anchor="middle">2  Claude replies</text>
+  <text x="520" y="413" class="bs mono" text-anchor="middle">stop_reason = ?</text>
 
-  <!-- 1: first call -->
-  <circle cx="36" cy="190" r="10" class="dot"/><text x="36" y="194" class="num" text-anchor="middle">1</text>
-  <line x1="172" y1="190" x2="497" y2="190" class="flow" marker-end="url(#arrow)"/>
-  <text x="335" y="182" class="lab" text-anchor="middle">call 1: system prompt + tools + [user: question]</text>
-  <text x="335" y="206" class="lab2" text-anchor="middle">messages: 1 · ≈1k tokens in</text>
+  <rect x="215" y="558" width="230" height="64" rx="8" class="tool"/>
+  <text x="330" y="584" class="bt" text-anchor="middle">3  Run search_corpus</text>
+  <text x="330" y="603" class="bs" text-anchor="middle">embed query → Chroma → top 5</text>
 
-  <!-- 2: Claude asks for a search -->
-  <circle cx="36" cy="276" r="10" class="dot"/><text x="36" y="280" class="num" text-anchor="middle">2</text>
-  <line x1="498" y1="276" x2="173" y2="276" class="flow" marker-end="url(#arrow)"/>
-  <text x="335" y="268" class="lab mono" text-anchor="middle">stop_reason: "tool_use"</text>
-  <text x="335" y="292" class="lab2 mono" text-anchor="middle">search_corpus("temporal ensembling in action chunking")</text>
+  <rect x="40" y="368" width="200" height="64" rx="8" class="you"/>
+  <text x="140" y="394" class="bt" text-anchor="middle">4  Append two messages</text>
+  <text x="140" y="413" class="bs" text-anchor="middle">Claude's request + the chunks</text>
 
-  <!-- 3: your code runs the search -->
-  <circle cx="36" cy="322" r="10" class="dot"/><text x="36" y="326" class="num" text-anchor="middle">3</text>
-  <line x1="172" y1="322" x2="797" y2="322" class="flow" marker-end="url(#arrow)"/>
-  <text x="640" y="314" class="lab" text-anchor="middle">run the function Claude named</text>
-  <rect x="710" y="332" width="180" height="40" rx="6" class="db"/>
-  <text x="800" y="348" class="bs" text-anchor="middle">embed query (bge + prefix)</text>
-  <text x="800" y="363" class="bs" text-anchor="middle">nearest 5 by cosine</text>
-  <line x1="798" y1="384" x2="173" y2="384" class="flow" marker-end="url(#arrow)"/>
-  <text x="485" y="400" class="lab2 mono" text-anchor="middle">act:0008 · act:0022 · act:0009 · act:0021 · act:0030</text>
-  <text x="485" y="376" class="lab" text-anchor="middle">5 chunks: text + section + pages</text>
+  <!-- Arc labels -->
+  <text x="534" y="514" class="lab mono" fill="#2e7d4f" font-weight="600">"tool_use"</text>
+  <text x="534" y="530" class="lab">Claude asks for a search</text>
+  <text x="40" y="634" class="lab">5 chunks: text, section, pages</text>
+  <text x="128" y="262" class="lab" text-anchor="end">next lap</text>
 
-  <!-- 4: second call -->
-  <circle cx="36" cy="438" r="10" class="dot"/><text x="36" y="442" class="num" text-anchor="middle">4</text>
-  <line x1="172" y1="438" x2="497" y2="438" class="flow" marker-end="url(#arrow)"/>
-  <text x="335" y="430" class="lab" text-anchor="middle">call 2: + [assistant: tool_use] + [user: tool_result]</text>
-  <text x="335" y="454" class="lab2" text-anchor="middle">messages: 3 · result matched by tool_use_id · ≈3k tokens in</text>
+  <!-- Centre -->
+  <text x="330" y="384" class="h2" text-anchor="middle" fill="#2e7d4f">the loop</text>
+  <text x="330" y="404" class="lab" text-anchor="middle">repeats until Claude</text>
+  <text x="330" y="419" class="lab" text-anchor="middle">stops asking for tools</text>
+  <text x="330" y="440" class="bs" text-anchor="middle">(cap it at about 5 laps)</text>
 
-  <!-- 5: Claude asks again -->
-  <circle cx="36" cy="496" r="10" class="dot"/><text x="36" y="500" class="num" text-anchor="middle">5</text>
-  <line x1="498" y1="496" x2="173" y2="496" class="flow" marker-end="url(#arrow)"/>
-  <text x="335" y="488" class="lab mono" text-anchor="middle">stop_reason: "tool_use" (again)</text>
-  <text x="335" y="512" class="lab2 mono" text-anchor="middle">search_corpus("temporal ensembling ablation")</text>
-  <line x1="172" y1="540" x2="797" y2="540" class="flow" marker-end="url(#arrow)"/>
-  <line x1="798" y1="556" x2="173" y2="556" class="flow" marker-end="url(#arrow)"/>
-  <text x="640" y="532" class="lab" text-anchor="middle">search again, append the result</text>
+  <!-- Exit -->
+  <line x1="615" y1="400" x2="698" y2="400" class="flow" marker-end="url(#arrow)"/>
+  <text x="656" y="391" class="lab mono" text-anchor="middle" font-weight="600">"end_turn"</text>
+  <rect x="700" y="368" width="260" height="64" rx="32" class="you"/>
+  <text x="830" y="394" class="bt" text-anchor="middle">Answer + citations</text>
+  <text x="830" y="413" class="bs mono" text-anchor="middle">[ACT, Sec. IV-A, p. 5]</text>
+  <text x="700" y="456" class="lab">The loop exits here; Rich prints it.</text>
 
-  <!-- 6: third call -->
-  <circle cx="36" cy="612" r="10" class="dot"/><text x="36" y="616" class="num" text-anchor="middle">6</text>
-  <line x1="172" y1="612" x2="497" y2="612" class="flow" marker-end="url(#arrow)"/>
-  <text x="335" y="604" class="lab" text-anchor="middle">call 3: the same list, two messages longer</text>
-  <text x="335" y="628" class="lab2" text-anchor="middle">messages: 5 · ≈5k tokens in</text>
+  <!-- Lap strip -->
+  <line x1="30" y1="670" x2="970" y2="670" stroke="#d8dce0" stroke-width="1"/>
+  <text x="30" y="696" class="h2">What step 1 sends on each lap</text>
+  <text x="30" y="714" class="lab">One block per message. Claude rereads the whole stack every lap, which is why input tokens grow.</text>
 
-  <!-- 7: Claude answers -->
-  <circle cx="36" cy="664" r="10" class="dot"/><text x="36" y="668" class="num" text-anchor="middle">7</text>
-  <line x1="498" y1="664" x2="173" y2="664" class="flow" marker-end="url(#arrow)"/>
-  <text x="335" y="656" class="lab mono" text-anchor="middle">stop_reason: "end_turn"</text>
-  <text x="335" y="680" class="lab2" text-anchor="middle">answer citing [ACT, Sec. IV-A, p. 5] and [ACT, Sec. VI-A, p. 9]</text>
+  <!-- Lap 1 -->
+  <text x="30" y="742" class="bt">Lap 1</text>
+  <text x="76" y="742" class="lab">· 1 message · ≈1k tokens in</text>
+  <rect x="30" y="752" width="270" height="20" rx="4" class="m-q"/>
+  <text x="40" y="766" class="blk">user: the question</text>
+  <text x="30" y="886" class="lab">reply: <tspan class="mono">search("temporal ensembling")</tspan></text>
 
-  <rect x="90" y="694" width="160" height="34" rx="8" class="ak"/>
-  <text x="170" y="715" class="bs" text-anchor="middle">loop exits · print with Rich</text>
+  <!-- Lap 2 -->
+  <text x="350" y="742" class="bt">Lap 2</text>
+  <text x="396" y="742" class="lab">· 3 messages · ≈3k tokens in</text>
+  <rect x="350" y="752" width="270" height="20" rx="4" class="m-q"/>
+  <text x="360" y="766" class="blk">user: the question</text>
+  <rect x="350" y="776" width="270" height="20" rx="4" class="m-tu"/>
+  <text x="360" y="790" class="blk">assistant: tool_use, search(…)</text>
+  <rect x="350" y="800" width="270" height="20" rx="4" class="m-tr"/>
+  <text x="360" y="814" class="blk">user: tool_result, 5 chunks</text>
+  <text x="350" y="886" class="lab">reply: <tspan class="mono">search("… ablation")</tspan></text>
 
-  <text x="30" y="760" class="note">Claude only ever returns text and tool requests. Running search_corpus, deciding to stop, and keeping the message list are your code's job.</text>
-  <text x="30" y="777" class="note">Cap the iterations (say 5): if Claude is still asking for tools after that, stop and report it rather than loop forever.</text>
+  <!-- Lap 3 -->
+  <text x="670" y="742" class="bt">Lap 3</text>
+  <text x="716" y="742" class="lab">· 5 messages · ≈5k tokens in</text>
+  <rect x="670" y="752" width="270" height="20" rx="4" class="m-q"/>
+  <text x="680" y="766" class="blk">user: the question</text>
+  <rect x="670" y="776" width="270" height="20" rx="4" class="m-tu"/>
+  <text x="680" y="790" class="blk">assistant: tool_use, search(…)</text>
+  <rect x="670" y="800" width="270" height="20" rx="4" class="m-tr"/>
+  <text x="680" y="814" class="blk">user: tool_result, 5 chunks</text>
+  <rect x="670" y="824" width="270" height="20" rx="4" class="m-tu"/>
+  <text x="680" y="838" class="blk">assistant: tool_use, search(…)</text>
+  <rect x="670" y="848" width="270" height="20" rx="4" class="m-tr"/>
+  <text x="680" y="862" class="blk">user: tool_result, 5 chunks</text>
+  <text x="670" y="886" class="lab">reply: <tspan class="mono" fill="#2e7d4f" font-weight="600">"end_turn"</tspan>, the answer</text>
 </svg>

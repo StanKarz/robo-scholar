@@ -63,10 +63,13 @@ answer is still wrong, or retrieval can fail while the model answers correctly
 from its training data. The second is a real failure (the system isn't using
 the corpus), and only a groundedness check catches it.
 
-**A config** is every setting that changes which chunks come back: chunk
-size, overlap and embedder (these change the stored vectors, so each needs a
-rebuilt index), plus query prefix, k and later the ranking method (dense or
-hybrid), which only change the query.
+**A config** is every setting that changes which chunks come back. Chunk
+size, overlap and embedder change the stored vectors, so each needs a rebuilt
+index; the query prefix and, later, the ranking method (dense or hybrid) only
+change the query. k isn't swept: one ranked list of 5 gives hit-rate@1, @3
+and @5 at once. The proposed grid (see "Embedding model choice") is 2 sizes ×
+3 overlaps × 2 embedders = 12 index builds, plus prefix off for the 6 bge
+builds: 18 scored rows, a few minutes in all. Hybrid search would double it.
 
 **The sweep** is a grid search over configs, as you'd sweep hyperparameters
 in MLflow. For each config: rebuild the index if needed, run score A over the
@@ -134,7 +137,7 @@ the embedder a config value and guarantees query and chunk vectors come from
 the same model. A collection's distance function is fixed at creation and
 defaults to L2. Docs: [Chroma](https://docs.trychroma.com/docs/overview/getting-started).
 
-Open in `retrieval.py` as of 2026-11-10:
+Open in `retrieval.py` as of 2026-11-10 (marked `TODO(4a)`–`TODO(4d)` in the file):
 
 1. One collection holds every config. Upserting a config with fewer chunks
    leaves the previous config's extras searchable: ACT at 1,000 words
