@@ -90,3 +90,18 @@ def fetch_all(
     force: bool = False,
 ) -> list[Result]:
     return [fetch_paper(p, dest_dir, force) for p in load_manifest(manifest)]
+
+
+def corpus_files(raw_dir: Path = Path("data/raw")) -> list[Path]:
+    """Every document the manifests list: papers first, then blogs, in manifest order.
+
+    The manifests define the corpus. A PDF in data/raw/papers/ with no manifest entry
+    is not part of it, so parked papers can stay on disk without leaking into ingest,
+    the index or the eval. Blog filenames follow the slug rule in ingest.fetch_blogs.
+    """
+    papers = [raw_dir / "papers" / p.filename for p in load_manifest(raw_dir / "papers.json")]
+    blogs = [
+        raw_dir / "blogs" / f"{entry['url'].rstrip('/').split('/')[-1]}.md"
+        for entry in json.loads((raw_dir / "blogs.json").read_text())
+    ]
+    return papers + blogs

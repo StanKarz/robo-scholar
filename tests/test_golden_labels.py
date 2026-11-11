@@ -2,11 +2,12 @@
 
 Section names are the join key between golden.json and chunk metadata: a label
 that drifts from the emitted form is a guaranteed silent miss on hit-rate@k and
-MRR, for every config (see SECTIONING_QUESTIONS.md). This suite turns that
-failure mode from "quietly lower scores" into a red test that lists near-miss
-candidates. Placeholder entries (containing REPLACE ME) are skipped.
+MRR, for every config (see NOTES.md, "Retrieval metrics"). This suite turns
+that failure mode from "quietly lower scores" into a red test that lists
+near-miss candidates. Placeholder entries (containing REPLACE ME) are skipped.
 
-Needs the fetched corpus: run `uv run rs fetch` first if data/raw/papers is empty.
+The corpus is whatever the manifests list (roboscholar.fetch.corpus_files).
+Needs the fetched papers: run `uv run rs fetch` first if data/raw/papers is empty.
 """
 
 import difflib
@@ -15,11 +16,12 @@ from pathlib import Path
 
 import pytest
 
+from roboscholar.fetch import corpus_files
 from roboscholar.ingest import ingest_file
 
 ROOT = Path(__file__).resolve().parents[1]
 GOLDEN_PATH = ROOT / "roboscholar" / "evals" / "golden.json"
-CORPUS_DIRS = (ROOT / "data" / "raw" / "papers", ROOT / "data" / "raw" / "blogs")
+RAW_DIR = ROOT / "data" / "raw"
 DIFFICULTIES = {"easy", "medium", "hard"}
 
 
@@ -35,14 +37,10 @@ def golden() -> list[dict]:
 @pytest.fixture(scope="module")
 def emitted() -> dict[str, set[str]]:
     """doc_id -> section labels the ingest pipeline emits, whole corpus."""
-    files = [
-        p
-        for d in CORPUS_DIRS
-        for suffix in ("*.pdf", "*.md")
-        for p in sorted(d.glob(suffix))
-    ]
-    if not files:
-        pytest.skip("corpus not fetched - run `uv run rs fetch`")
+    files = corpus_files(RAW_DIR)
+    missing = [f.name for f in files if not f.exists()]
+    if missing:
+        pytest.skip(f"corpus not fetched ({', '.join(missing)}) - run `uv run rs fetch`")
     sections: dict[str, set[str]] = {}
     for f in files:
         records, _ = ingest_file(f, 500, 50)

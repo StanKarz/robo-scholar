@@ -46,42 +46,76 @@ def fetch(
 
 @app.command()
 def ingest(
-    path: str = typer.Argument("data/raw", help="PDF file, markdown file, or directory to ingest."),
+    path: str | None = typer.Argument(
+        None,
+        help="PDF file, markdown file, or directory. Default: every document in the manifests.",
+    ),
     n_words: int = typer.Option(500, help="Target chunk size in words."),
     overlap_words: int = typer.Option(50, help="Chunk overlap in words."),
 ):
     """Parse documents into chunks (storage in Chroma lands with retrieval.py)."""
     from pathlib import Path
 
+    from rich.progress import (
+        BarColumn,
+        MofNCompleteColumn,
+        Progress,
+        SpinnerColumn,
+        TextColumn,
+        TimeElapsedColumn,
+    )
     from rich.table import Table
 
+    from roboscholar.fetch import corpus_files
     from roboscholar.ingest import ingest_file
 
-    target = Path(path)
-    files = (
-        sorted(p for suffix in ("*.pdf", "*.md") for p in target.rglob(suffix))
-        if target.is_dir()
-        else [target]
-    )
-    if not files:
-        console.print(f"[red]No .pdf or .md files found under {target}[/red]")
-        raise typer.Exit(1)
+    if path is None:
+        files = corpus_files()
+        missing = [f for f in files if not f.exists()]
+        if missing:
+            names = ", ".join(f.name for f in missing)
+            console.print(f"[red]Listed in the manifests but not on disk: {names}[/red]")
+            console.print("Run `uv run rs fetch` first.")
+            raise typer.Exit(1)
+    else:
+        target = Path(path)
+        files = (
+            sorted(p for suffix in ("*.pdf", "*.md") for p in target.rglob(suffix))
+            if target.is_dir()
+            else [target]
+        )
+        if not files:
+            console.print(f"[red]No .pdf or .md files found under {target}[/red]")
+            raise typer.Exit(1)
 
     table = Table(title=f"Chunks ({n_words}w / {overlap_words}w overlap)")
     for col in ("document", "chunks", "sections", "avg words", "warnings"):
         table.add_column(col)
     all_records = []
-    for f in files:
-        records, unmatched = ingest_file(f, n_words, overlap_words)
-        all_records.extend(records)
-        warn = f"[red]{len(unmatched)} unmatched headings[/red]" if unmatched else "-"
-        table.add_row(
-            f.stem,
-            str(len(records)),
-            str(len({r["section"] for r in records})),
-            str(round(sum(r["n_words"] for r in records) / max(len(records), 1))),
-            warn,
-        )
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+        console=console,
+        transient=True,
+    )
+    with progress:
+        task = progress.add_task("Parsing", total=len(files))
+        for f in files:
+            progress.update(task, description=f"Parsing {f.name}")
+            records, unmatched = ingest_file(f, n_words, overlap_words)
+            all_records.extend(records)
+            warn = f"[red]{len(unmatched)} unmatched headings[/red]" if unmatched else "-"
+            table.add_row(
+                f.stem,
+                str(len(records)),
+                str(len({r["section"] for r in records})),
+                str(round(sum(r["n_words"] for r in records) / max(len(records), 1))),
+                warn,
+            )
+            progress.advance(task)
     console.print(table)
     console.print(
         f"{len(all_records)} chunks total. "
