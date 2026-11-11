@@ -24,9 +24,8 @@ this way" actually gets answered.
 - **Eval** — golden set + retrieval metrics (hit-rate@k, MRR) + LLM-as-judge,
   so every retrieval change is justified by a number, not a feeling
 
-**Parked ideas** — written down, not built (see `NOTES.md` → Ideas): a
-concept glossary grounded in the corpus; visualising or simulating concepts
-from a paper.
+**Parked ideas** — written down, not built (see `NOTES.md` → Ideas):
+visualising or simulating concepts from a paper.
 
 **Non-goals**: web UI, multi-user anything, fine-tuning, supporting every
 document format. This is a CLI over a local corpus, on purpose.
