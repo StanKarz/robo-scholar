@@ -105,7 +105,7 @@ the point; studying with it is the useful side effect.
 | -------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | LLM                  | Anthropic SDK direct, no LangChain/LlamaIndex                     | Frameworks hide the loop you need to be able to explain                                       |
 | Vector DB            | Chroma (embedded, local)                                          | Zero infra, persists to disk; fewer prod features than Qdrant, not needed for v1              |
-| Embeddings           | voyage-3-lite (API) vs. bge-small (local)                         | Decided by the eval harness — see "Embedding model choice"                                    |
+| Embeddings           | voyage-4-lite (API) vs. bge-small (local)                         | Decided by the eval harness — see "Embedding model choice"                                    |
 | PDF parsing          | PyMuPDF first, Docling as plan B                                  | Academic PDFs are hostile; never silently degrade to a naive text dump                        |
 | Search               | Dense first; BM25 + reciprocal rank fusion is the planned upgrade | Hybrid retrieval is common in practice and RRF is ~20 lines                                   |
 | Interface            | Typer + Rich CLI                                                  | Ships fast; a web UI is an explicit non-goal (README)                                         |
@@ -260,7 +260,7 @@ compared equal strings). Fixtures must be *distinct and realistic*.
 
 | Model             | Where      | Cost                                     | Input limit               | Notes                    |
 | ----------------- | ---------- | ---------------------------------------- | ------------------------- | ------------------------ |
-| voyage-3-lite     | API        | ~free at this corpus size (token-priced) | 32k tok                   | needs network + key      |
+| voyage-4-lite     | API        | 200M tokens free, then $0.02/M           | 32k tok                   | needs network + key      |
 | bge-small-en-v1.5 | local (M1) | free                                     | 512 tok (~350 words here) | the real local candidate |
 | all-MiniLM-L6-v2  | local      | free                                     | **256 tok (~175 words)**  | truncates silently       |
 
@@ -268,11 +268,19 @@ Process: fixed golden set, small full grid, every run stored in SQLite,
 decided on hit-rate@k then MRR, with cost, offline use and latency in the run
 notes.
 
+**voyage-3-lite → voyage-4-lite (2026-11-11).** Voyage's docs now list
+voyage-3-lite under "older models", with no free tokens. voyage-4-lite costs
+the same ($0.02/M) and comes with 200M free tokens; a full index build is
+roughly 90k tokens. It returns 1024 numbers per text against bge-small's
+384. Its `input_type="query"` / `"document"` does the same job as bge's query
+prefix, except Voyage prepends the prompt on its side. Order of work: every
+retrieval fix on bge first, Voyage added after.
+
 **Truncation measured (2026-11), and it changes the grid.** Chunks over
 bge-small's 512 tokens across the 8 labelled documents: 2 of 386 at 200 words,
 25 of 261 at 350, 77 of 215 at 500 (longest 1,212). The originally planned
 500 vs 1,000 words would mostly measure truncation. Proposed instead: 200 and
-350 words × 0/10/20% overlap × bge-small and voyage-3-lite (12 runs), plus the
+350 words × 0/10/20% overlap × bge-small and voyage-4-lite (12 runs), plus the
 bge query prefix on and off, with MiniLM dropped. Not yet decided.
 
 ---
