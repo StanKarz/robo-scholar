@@ -34,3 +34,8 @@ packages = ["roboscholar"]
 dev = [
     "pytest>=9.1.1",
 ]
+
+[tool.pytest.ini_options]
+# PyMuPDF's SWIG bindings raise a DeprecationWarning on import under Python 3.13
+# ("builtin type SwigPyPacked has no __module__ attribute"). Third-party and harmless.
+filterwarnings = ["ignore:builtin type swig:DeprecationWarning"]

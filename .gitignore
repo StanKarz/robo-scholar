@@ -24,3 +24,6 @@ data/raw/papers/
 
 # Local project notes — not tracked
 CLAUDE.md
+
+# Editor settings (local)
+.vscode/
