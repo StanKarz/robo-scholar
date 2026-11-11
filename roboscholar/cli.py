@@ -1,7 +1,11 @@
 """Typer CLI — thin adapter over the core library. Installed as `rs`."""
 
 import typer
+from dotenv import load_dotenv
 from rich.console import Console
+
+# API keys (VOYAGE_API_KEY, ANTHROPIC_API_KEY) live in .env, which is gitignored.
+load_dotenv()
 
 app = typer.Typer(no_args_is_help=True, help="RoboScholar — agentic research assistant for embodied AI papers.")
 eval_app = typer.Typer(no_args_is_help=True, help="Run and report evals.")
