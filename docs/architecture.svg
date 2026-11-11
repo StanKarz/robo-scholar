@@ -1,0 +1,184 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 848" width="1000" height="848" role="img" aria-label="RoboScholar architecture: flow 1 indexes documents into Chroma once; flow 2 answers each question with an agent loop that searches Chroma; flow 3 scores retrieval and answers against the golden set, and the sweep repeats it per config.">
+  <title>RoboScholar architecture: three flows, one index</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#59636e"/>
+    </marker>
+    <marker id="arrow-sweep" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b5651d"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #1f2328; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .h { font-size: 19px; font-weight: 700; }
+    .sub { font-size: 12.5px; fill: #59636e; }
+    .pt { font-size: 15px; font-weight: 700; }
+    .ps { font-size: 12px; fill: #59636e; }
+    .bt { font-size: 13px; font-weight: 600; }
+    .bm { font-size: 12px; font-weight: 600; }
+    .bs { font-size: 10.5px; fill: #59636e; }
+    .lab { font-size: 11px; fill: #59636e; }
+    .note { font-size: 11.5px; fill: #59636e; }
+    .flow { stroke: #59636e; stroke-width: 1.5; fill: none; }
+    .sweep { stroke: #b5651d; stroke-width: 1.5; fill: none; stroke-dasharray: 5 4; }
+    .ix { stroke: #2f6fb3; stroke-width: 1.5; fill: #ffffff; }
+    .ak { stroke: #2e7d4f; stroke-width: 1.5; fill: #ffffff; }
+    .ev { stroke: #b5651d; stroke-width: 1.5; fill: #ffffff; }
+    .todo { stroke-dasharray: 5 4; }
+    .db { stroke: #6b4fa8; stroke-width: 1.5; fill: #f3effa; }
+    .sql { stroke: #6e7781; stroke-width: 1.5; fill: #f4f4f5; }
+  </style>
+
+  <rect x="0" y="0" width="1000" height="848" rx="14" fill="#fcfbf8"/>
+
+  <!-- Header and legend -->
+  <text x="30" y="42" class="h">RoboScholar architecture</text>
+  <text x="30" y="64" class="sub">Three flows share one Chroma index: flow 1 writes it, flows 2 and 3 read it.</text>
+  <rect x="760" y="34" width="26" height="14" rx="3" fill="#ffffff" stroke="#59636e" stroke-width="1.5"/>
+  <text x="792" y="45" class="lab">exists</text>
+  <rect x="850" y="34" width="26" height="14" rx="3" fill="#ffffff" stroke="#59636e" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="882" y="45" class="lab">not built yet</text>
+
+  <!-- ===== Flow 1: Index ===== -->
+  <rect x="16" y="84" width="968" height="180" rx="10" fill="#f2f6fb"/>
+  <text x="30" y="110" class="pt" fill="#2f6fb3">1  Index</text>
+  <text x="30" y="128" class="ps">Once per document. Rebuilt from scratch when chunk size, overlap or embedder changes.</text>
+
+  <rect x="30" y="150" width="130" height="56" rx="8" class="ix"/>
+  <text x="95" y="172" class="bt" text-anchor="middle">Manifests</text>
+  <text x="95" y="187" class="bs mono" text-anchor="middle">papers.json</text>
+  <text x="95" y="199" class="bs mono" text-anchor="middle">blogs.json</text>
+
+  <line x1="160" y1="178" x2="218" y2="178" class="flow" marker-end="url(#arrow)"/>
+  <text x="190" y="170" class="lab mono" text-anchor="middle">rs fetch</text>
+
+  <rect x="220" y="150" width="130" height="56" rx="8" class="ix"/>
+  <text x="285" y="174" class="bt" text-anchor="middle">PDFs + markdown</text>
+  <text x="285" y="192" class="bs mono" text-anchor="middle">data/raw/</text>
+
+  <line x1="350" y1="178" x2="458" y2="178" class="flow" marker-end="url(#arrow)"/>
+  <text x="405" y="170" class="lab mono" text-anchor="middle">ingest.py</text>
+  <text x="405" y="194" class="lab" text-anchor="middle">parse · chunk</text>
+
+  <rect x="460" y="150" width="150" height="56" rx="8" class="ix"/>
+  <text x="535" y="174" class="bt" text-anchor="middle">Chunks + metadata</text>
+  <text x="535" y="192" class="bs mono" text-anchor="middle">act:0008 · IV-A · pp. 4–5</text>
+
+  <line x1="610" y1="178" x2="708" y2="178" class="flow" marker-end="url(#arrow)"/>
+  <text x="660" y="170" class="lab" text-anchor="middle">embed + store</text>
+  <text x="660" y="194" class="lab mono" text-anchor="middle">retrieval.py</text>
+
+  <path d="M710,151 L710,205 A70,9 0 0 0 850,205 L850,151 Z" class="db"/>
+  <ellipse cx="780" cy="151" rx="70" ry="9" class="db"/>
+  <text x="780" y="182" class="bt" text-anchor="middle">Chroma</text>
+  <text x="780" y="197" class="bs" text-anchor="middle">vectors + text</text>
+  <text x="780" y="209" class="bs" text-anchor="middle">+ metadata</text>
+
+  <text x="868" y="172" class="note">Read by</text>
+  <text x="868" y="187" class="note">flows 2 and 3</text>
+
+  <text x="30" y="244" class="note" font-style="italic">New paper? Add it to the manifest and re-run this flow. Flows 2 and 3 don't change.</text>
+
+  <!-- ===== Flow 2: Ask ===== -->
+  <rect x="16" y="280" width="968" height="236" rx="10" fill="#f1f7f3"/>
+  <text x="30" y="306" class="pt" fill="#2e7d4f">2  Ask</text>
+  <text x="30" y="324" class="ps">Every question (rs ask, rs compare). No judge here: the judge only runs in flow 3.</text>
+
+  <rect x="30" y="358" width="120" height="56" rx="28" class="ak"/>
+  <text x="90" y="382" class="bt" text-anchor="middle">Question</text>
+  <text x="90" y="399" class="bs mono" text-anchor="middle">rs ask "…"</text>
+
+  <line x1="150" y1="386" x2="193" y2="386" class="flow" marker-end="url(#arrow)"/>
+
+  <rect x="195" y="356" width="170" height="60" rx="8" class="ak todo"/>
+  <text x="280" y="382" class="bt" text-anchor="middle">Agent loop</text>
+  <text x="280" y="399" class="bs mono" text-anchor="middle">agent.py · Claude</text>
+
+  <line x1="365" y1="374" x2="453" y2="374" class="flow" marker-end="url(#arrow)"/>
+  <text x="410" y="367" class="lab mono" text-anchor="middle">tool_use</text>
+  <line x1="455" y1="398" x2="367" y2="398" class="flow" marker-end="url(#arrow)"/>
+  <text x="410" y="413" class="lab mono" text-anchor="middle">tool_result</text>
+
+  <rect x="455" y="356" width="140" height="60" rx="8" class="ak todo"/>
+  <text x="525" y="382" class="bm mono" text-anchor="middle">search_corpus</text>
+  <text x="525" y="399" class="bs mono" text-anchor="middle">tools.py</text>
+
+  <line x1="595" y1="386" x2="648" y2="386" class="flow" marker-end="url(#arrow)"/>
+
+  <rect x="650" y="356" width="150" height="60" rx="8" class="ak"/>
+  <text x="725" y="377" class="bm mono" text-anchor="middle">rank_chunks</text>
+  <text x="725" y="392" class="bs" text-anchor="middle">embed query + prefix</text>
+  <text x="725" y="405" class="bs" text-anchor="middle">nearest k by cosine</text>
+
+  <line x1="800" y1="377" x2="848" y2="377" class="flow" marker-end="url(#arrow)"/>
+  <line x1="850" y1="397" x2="802" y2="397" class="flow" marker-end="url(#arrow)"/>
+
+  <path d="M850,355 L850,417 A65,9 0 0 0 980,417 L980,355 Z" class="db"/>
+  <ellipse cx="915" cy="355" rx="65" ry="9" class="db"/>
+  <text x="915" y="390" class="bt" text-anchor="middle">Chroma</text>
+  <text x="915" y="405" class="bs" text-anchor="middle">same index</text>
+
+  <line x1="280" y1="416" x2="280" y2="450" class="flow" marker-end="url(#arrow)"/>
+  <text x="290" y="437" class="lab mono">end_turn</text>
+
+  <rect x="195" y="452" width="170" height="48" rx="8" class="ak todo"/>
+  <text x="280" y="472" class="bt" text-anchor="middle">Answer + citations</text>
+  <text x="280" y="489" class="bs mono" text-anchor="middle">[ACT, Sec. IV-A, pp. 4–5]</text>
+
+  <text x="455" y="466" class="note">The loop repeats until Claude answers. It may search several</text>
+  <text x="455" y="481" class="note">times first, e.g. once per paper for rs compare.</text>
+  <text x="455" y="496" class="note">Step by step: docs/agent-loop.svg</text>
+
+  <!-- ===== Flow 3: Evaluate ===== -->
+  <rect x="16" y="532" width="968" height="300" rx="10" fill="#fbf5ee"/>
+  <text x="30" y="558" class="pt" fill="#b5651d">3  Evaluate</text>
+  <text x="30" y="576" class="ps">Once per config. Row A is the sweep's inner loop; row B runs on the winner.</text>
+
+  <path d="M790,622 V603 H310 V624" class="sweep" marker-end="url(#arrow-sweep)"/>
+  <text x="550" y="597" class="lab" text-anchor="middle" fill="#b5651d">sweep: next config → rebuild the index (flow 1) → score row A again</text>
+
+  <rect x="30" y="626" width="140" height="166" rx="8" class="ev"/>
+  <text x="100" y="690" class="bt" text-anchor="middle">Golden set</text>
+  <text x="100" y="707" class="bs mono" text-anchor="middle">golden.json</text>
+  <text x="100" y="726" class="bs" text-anchor="middle">34 questions,</text>
+  <text x="100" y="740" class="bs" text-anchor="middle">hand-labelled</text>
+
+  <line x1="170" y1="654" x2="218" y2="654" class="flow" marker-end="url(#arrow)"/>
+  <line x1="170" y1="764" x2="218" y2="764" class="flow" marker-end="url(#arrow)"/>
+
+  <rect x="220" y="626" width="180" height="56" rx="8" class="ev"/>
+  <text x="310" y="650" class="bm mono" text-anchor="middle">rank_chunks</text>
+  <text x="310" y="667" class="bs" text-anchor="middle">top-k per question</text>
+
+  <line x1="400" y1="654" x2="458" y2="654" class="flow" marker-end="url(#arrow)"/>
+
+  <rect x="460" y="626" width="180" height="56" rx="8" class="ev todo"/>
+  <text x="550" y="650" class="bm mono" text-anchor="middle">metrics.py</text>
+  <text x="550" y="667" class="bs" text-anchor="middle">hit-rate@k · MRR</text>
+
+  <line x1="640" y1="654" x2="718" y2="654" class="flow" marker-end="url(#arrow)"/>
+  <text x="220" y="700" class="lab" font-weight="600" fill="#b5651d">A · retrieval score: no LLM, free, seconds per run</text>
+
+  <rect x="220" y="736" width="180" height="56" rx="8" class="ev todo"/>
+  <text x="310" y="760" class="bt" text-anchor="middle">Agent loop</text>
+  <text x="310" y="777" class="bs" text-anchor="middle">same as flow 2</text>
+
+  <line x1="400" y1="764" x2="458" y2="764" class="flow" marker-end="url(#arrow)"/>
+
+  <rect x="460" y="736" width="180" height="56" rx="8" class="ev todo"/>
+  <text x="550" y="760" class="bm mono" text-anchor="middle">judge.py</text>
+  <text x="550" y="777" class="bs" text-anchor="middle">correct? grounded?</text>
+
+  <line x1="640" y1="764" x2="718" y2="764" class="flow" marker-end="url(#arrow)"/>
+  <text x="220" y="810" class="lab" font-weight="600" fill="#b5651d">B · answer score: Claude calls per question, costs money</text>
+
+  <path d="M720,632 L720,782 A70,10 0 0 0 860,782 L860,632 Z" class="sql todo"/>
+  <ellipse cx="790" cy="632" rx="70" ry="10" class="sql todo"/>
+  <text x="790" y="700" class="bm mono" text-anchor="middle">eval_runs</text>
+  <text x="790" y="716" class="bs" text-anchor="middle">SQLite</text>
+  <text x="790" y="731" class="bs" text-anchor="middle">config + scores</text>
+
+  <text x="875" y="690" class="note mono">rs eval report</text>
+  <text x="875" y="705" class="note">compares runs</text>
+</svg>
