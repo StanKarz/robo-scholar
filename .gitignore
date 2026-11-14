@@ -27,3 +27,6 @@ CLAUDE.md
 
 # Editor settings (local)
 .vscode/
+
+# marimo's per-notebook session cache
+__marimo__/

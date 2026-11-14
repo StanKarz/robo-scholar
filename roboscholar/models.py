@@ -1,4 +1,4 @@
-"""Pydantic schemas: Chunk, QuizQuestion, JudgeScore, EvalRun."""
+"""Pydantic schemas: Chunk, RetrievedChunk, QuizQuestion, JudgeScore, EvalRun."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class Chunk(BaseModel):
+    """One indexed chunk: its text plus where it came from in the source."""
+
     id: str
     text: str
     paper_id: str
@@ -16,6 +18,12 @@ class Chunk(BaseModel):
     page_start: int
     page_end: int
     n_words: int
+
+
+class RetrievedChunk(Chunk):
+    """A Chunk returned by rank_chunks, with its cosine distance to the query."""
+
+    distance: float
 
 
 class QuizQuestion(BaseModel):
@@ -63,11 +71,20 @@ class JudgeScore(BaseModel):
 
 
 class EvalRun(BaseModel):
+    """One row of the sweep: a config and its score-A retrieval metrics."""
+
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    # ingest config - this makes hit rate/MRR comparable across runs
-    embedding_model: Literal["voyage-3-lite", "bge-small", "all-MiniLM"] = Field(
+    # config - every setting that changes which chunks come back, so rows are
+    # comparable. When hybrid search lands, add a ranking-method field.
+    embedding_model: Literal["bge-small", "voyage-4-lite"] = Field(
         description="Embedding model used for this run"
+    )
+    has_query_prefix: bool = Field(
+        description=(
+            "Whether queries got the model's search instruction: bge's prefix, "
+            'or input_type="query" for Voyage'
+        )
     )
 
     n_words: int = Field(gt=0, description="Chunk size in words")
@@ -82,10 +99,23 @@ class EvalRun(BaseModel):
     hit_rate_at_k: float = Field(
         ge=0.0,
         le=1.0,
-        description="Fraction of golden questions with a relevant chunk in top k",
+        description=(
+            "Fraction of golden questions with a correct chunk in the top k, where "
+            "correct means paper and section match. This one decides the sweep."
+        ),
+    )
+    hit_rate_or_at_k: float = Field(
+        ge=0.0,
+        le=1.0,
+        description=(
+            "The same under the lenient rule (section match OR page overlap). "
+            "A sanity column: if it picks a different winner, read the failures."
+        ),
     )
     mrr: float = Field(
-        ge=0.0, le=1.0, description="Mean reciprocal rank across golden questions"
+        ge=0.0,
+        le=1.0,
+        description="Mean reciprocal rank of the first correct chunk (section match)",
     )
 
     notes: str = Field(
@@ -94,7 +124,8 @@ class EvalRun(BaseModel):
     )
 
     @model_validator(mode="after")
-    def overlap_smaller_than_chunk(self):
+    def overlap_smaller_than_chunk(self) -> EvalRun:
+        """Reject a config whose overlap is as long as the chunk itself."""
         if self.overlap_words >= self.n_words:
             raise ValueError("overlap_words must be smaller than n_words")
         return self
