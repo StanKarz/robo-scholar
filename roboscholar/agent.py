@@ -2,5 +2,5 @@
 
 Docs to read first:
 - https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview
-- README §2 has the ~10-line loop sketch.
+- docs/agent-loop.svg and NOTES.md, "Flow 2: ask", for the loop step by step.
 """
