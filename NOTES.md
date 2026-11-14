@@ -67,9 +67,10 @@ the corpus), and only a groundedness check catches it.
 size, overlap and embedder change the stored vectors, so each needs a rebuilt
 index; the query prefix and, later, the ranking method (dense or hybrid) only
 change the query. k isn't swept: one ranked list of 5 gives hit-rate@1, @3
-and @5 at once. The proposed grid (see "Embedding model choice") is 2 sizes ×
-3 overlaps × 2 embedders = 12 index builds, plus prefix off for the 6 bge
-builds: 18 scored rows, a few minutes in all. Hybrid search would double it.
+and @5 at once. The grid (decided 2026-11-12, see "Embedding model choice")
+is 2 sizes × 3 overlaps × 2 embedders = 12 index builds, plus prefix off for
+the 6 bge builds: 18 scored rows, a few minutes in all. Hybrid search would
+double it.
 
 **The sweep** is a grid search over configs, as you'd sweep hyperparameters
 in MLflow. For each config: rebuild the index if needed, run score A over the
@@ -279,9 +280,16 @@ retrieval fix on bge first, Voyage added after.
 **Truncation measured (2026-11), and it changes the grid.** Chunks over
 bge-small's 512 tokens across the 8 labelled documents: 2 of 386 at 200 words,
 25 of 261 at 350, 77 of 215 at 500 (longest 1,212). The originally planned
-500 vs 1,000 words would mostly measure truncation. Proposed instead: 200 and
-350 words × 0/10/20% overlap × bge-small and voyage-4-lite (12 runs), plus the
-bge query prefix on and off, with MiniLM dropped. Not yet decided.
+500 vs 1,000 words would mostly measure truncation. Instead: 200 and 350
+words × 0/10/20% overlap × bge-small and voyage-4-lite (12 builds), plus the
+bge query prefix on and off (18 rows), with MiniLM dropped.
+
+**Grid decided 2026-11-12: all 18 rows in one sweep.** The alternatives were
+bge's 12 rows first with Voyage's 6 later, or one factor at a time from a
+baseline (~5 rows). Rows are nearly free (score A makes no LLM calls; six
+Voyage builds use ~540k of the 200M free tokens), the Voyage branch is close,
+and only a full grid shows interactions: Voyage never truncates, so it may
+prefer 350 words where bge starts to clip.
 
 ---
 
@@ -319,12 +327,15 @@ corpus grows.
 
 ## Retrieval metrics — how they work, how to read them
 
-A retrieved chunk counts as **correct** when its `paper_id` matches the label
-and its section matches `source_sections` **or** its page range overlaps
-`source_pages` (blogs: section only).
+A retrieved chunk counts as **correct** when its `paper_id` matches
+`source_paper` and its `section` is one of `source_sections` (exact match).
+Pages don't count. The old OR rule (section or page overlap) is reported
+alongside as a sanity column; if the two pick different winners, read the
+failing questions.
 
-**OR, not AND — decided 2026-09.** Page ranges are reliable; section names
-come from ToC matching, which can fail. OR gives each axis a fallback; AND
+**OR, not AND — decided 2026-09, superseded 2026-11-12.** Page ranges are
+reliable; section names come from ToC matching, which can fail. OR gives each
+axis a fallback; AND
 turns every labelling slip into a silent zero that looks like a worse config.
 
 **Reopened 2026-11-10: OR is lenient.** At 500 words, a question has on
@@ -335,8 +346,13 @@ VI-C and the conclusion: 7 of ACT's 34 chunks where section match accepts 1.
 A config that ranks the wrong section first still scores a hit, so configs
 bunch near the ceiling. Meanwhile the failure OR guarded against, a label that
 doesn't match what ingest emits, is now caught by `tests/test_golden_labels.py`.
-Proposed: decide the sweep on section match, report OR alongside. Not yet
-decided.
+
+**Section match decided 2026-11-12.** Measured over all 34 questions at 0
+overlap, the share of a paper's chunks counted correct is 10% (200 words) and
+9% (350) under section match, about the same under AND, and 15% at both sizes
+under OR. So OR is half as lenient again, but not biased by chunk size (the
+worry was that longer chunks span more pages). AND barely differs from
+section match and adds a second way for a labelling slip to score zero.
 
 **Validate labels before embedding anything.** `tests/test_golden_labels.py`
 asserts every `source_sections` value appears in emitted chunk metadata, with
@@ -350,12 +366,14 @@ chunks, so what counts is whether the answer is in there at all. **MRR**: mean
 of 1/rank of the first correct chunk (0 if absent). Rewards ranking, and
 shows improvements once hit-rate@k saturates.
 
-**Picking a config.** Primary: hit-rate@k at the k `search_corpus` will
-actually use. Tiebreaker: MRR, then cost/latency/offline notes. With 34
-questions each is worth about 3 points of hit-rate, so a few percent is noise:
-prefer configs that win across slices (per paper, papers vs. blogs), and
-eyeball the failures, since one mislabelled entry moves a comparison more than
-most real effects.
+**Picking a config (fixed 2026-11-12, before any results).** Hit-rate@5
+under section match decides. With 34 questions each is worth about 3 points,
+so gaps under 2 questions (~6 points) are ties. Ties go to MRR, then to the
+cheaper, offline option (bge). Prefer configs that win across slices (per
+paper, papers vs. blogs), and eyeball the failures, since one mislabelled
+entry moves a comparison more than most real effects. Writing the rule down
+first matters: the best of 18 noisy scores is flattered by luck, and choosing
+the rule after seeing results lets it drift towards the favourite.
 
 ---
 
