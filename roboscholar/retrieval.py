@@ -32,10 +32,8 @@ HF_MODEL_NAMES = {"bge-small": "BAAI/bge-small-en-v1.5"}
 # takes seconds, so each one is built at most once per process.
 _EMBEDDERS: dict[str, SentenceTransformer] = {}
 
-# The index lives at <project root>/data/chroma. Built from this file's location
-# rather than the current directory, so a notebook started inside notebooks/
-# opens the same index `rs` builds instead of creating an empty one there.
-# parents[0] is roboscholar/, parents[1] the project root.
+# <project root>/data/chroma (parents[1] is the project root). Built from this
+# file's location, so a notebook started in notebooks/ opens the same index.
 CHROMA_DIR = Path(__file__).resolve().parents[1] / "data" / "chroma"
 
 # One client for the whole module. Collection handles are fetched by name inside
@@ -67,30 +65,24 @@ def create_embeddings(
     *,
     has_query_prefix: bool = True,
 ) -> list[Sequence[float]]:
-    """Turn text into vectors. The only place an embedding model is invoked.
+    """Turn text into vectors. The only place an embedding model is called.
 
-    Both the indexing path and the query path go through here, which is what
-    guarantees stored chunks and incoming queries land in the same vector
-    space. Embedding a query with a different model than the chunks produces
-    plausible-looking nonsense rather than an error.
+    Indexing and querying both come through here, so chunks and queries are
+    always embedded by the same model. A mismatch wouldn't raise an error;
+    it would return plausible-looking nonsense.
 
     Args:
-        texts: Raw strings to embed: chunk text when indexing, the question
-            when querying.
-        query_type: "document" for chunks being indexed, "query" for a
-            question being searched. Both models embed the two differently:
-            bge wants an instruction prefix on queries only; Voyage takes this
-            value as its `input_type`.
-        model: Which embedder to use. This is the swap point the config sweep
-            turns: the value stored in `EvalRun.embedding_model`.
-        has_query_prefix: Whether a query gets bge's search instruction.
+        texts: Chunk texts when indexing, the question when querying.
+        query_type: "document" for chunks, "query" for a question. bge adds a
+            search instruction to queries only; Voyage takes this as its
+            `input_type`.
+        model: The embedder, as stored in `EvalRun.embedding_model`.
+        has_query_prefix: Whether a bge query gets its search instruction.
             False only for the sweep's six prefix-off rows.
 
     Returns:
-        One vector per input string, in the same order, as plain Python lists
-        whichever model made them. Declared as `Sequence[float]` because that
-        is what Chroma's add() and query() declare, and a list type only
-        matches its exact element type.
+        One vector per input, in order, typed `Sequence[float]` to match
+        Chroma's add() and query().
 
     Raises:
         ValueError: If `model` isn't one this project knows about.
@@ -111,14 +103,13 @@ def create_embeddings(
             embeddings = load_embedder(model).encode(texts, prompt=None).tolist()
 
     elif model == "voyage-4-lite":
-        # Built per call, not at import: the client reads VOYAGE_API_KEY once,
-        # when constructed, so one built before load_dotenv() stays keyless for
-        # good. It holds only the key and URL (~1 µs to build); the model runs
-        # on Voyage's servers, so there's nothing worth caching here.
+        # Built per call: the client reads VOYAGE_API_KEY when it's constructed,
+        # so one built at import, before load_dotenv(), would stay keyless.
+        # Building one takes ~1 µs.
         vo = voyageai.Client()
-        # Voyage types .embeddings as "floats or ints". Ints only come back when
-        # you ask for quantised output (embed's output_dtype), which we never do,
-        # so cast tells the type checker what we know. It does nothing at runtime.
+        # .embeddings is typed "floats or ints"; ints only come back for
+        # quantised output (output_dtype), which we never ask for. cast only
+        # informs the type checker.
         embeddings = cast(
             list[Sequence[float]],
             vo.embed(texts, model=model, input_type=query_type).embeddings,
@@ -135,26 +126,19 @@ def create_embeddings(
 def index_chroma(records: list[ChunkRecord], model: str) -> None:
     """Rebuild the Chroma collection from empty and fill it with `records`.
 
-    Runs once per ingest config, not per query: the expensive, do-it-upfront
-    half of retrieval. Each build deletes the old collection and creates a new
-    one, so no chunk from a previous config survives (upsert or add into the
-    old collection would leave them behind: sandbox sections 4 and 5). The new
-    collection uses cosine distance and records `model` in its metadata, so
-    rank_chunks embeds queries with the model that built the index.
+    Runs once per ingest config. Deleting and recreating the collection means
+    no chunk from a previous config survives (upsert or add would leave them
+    behind: sandbox sections 4 and 5). The collection uses cosine distance and
+    records `model` in its metadata, so rank_chunks embeds queries with the
+    same model.
 
-    The chunks are embedded before anything is deleted, so a build that fails
-    (a mistyped model, a Voyage rate limit) leaves the previous index as it was.
-
-    Each chunk becomes one row: id, text, vector and metadata. `paper_id`,
-    `section` and the page range are what `metrics.py` compares against the
-    golden set's labels and what an answer cites; `n_words` is there so a
-    result can be rebuilt as a `RetrievedChunk`.
+    Embedding runs before the delete, so a failed build (a mistyped model, a
+    Voyage rate limit) leaves the previous index as it was.
 
     Args:
         records: Chunk dicts straight from `ingest_file`.
         model: The embedder for this build, e.g. "bge-small".
     """
-    # The step that can fail runs first, before the step that destroys anything.
     embeddings = create_embeddings([r["text"] for r in records], "document", model)
 
     # Delete the previous build if there is one. On a fresh clone there isn't,
@@ -190,31 +174,24 @@ def index_chroma(records: list[ChunkRecord], model: str) -> None:
 def rank_chunks(
     query_str: str, k: int = 5, *, has_query_prefix: bool = True
 ) -> list[RetrievedChunk]:
-    """Retrieve the k chunks closest to a question, best match first.
-
-    The cheap, per-question half of retrieval. Chroma does the ranking
-    (nearest-neighbour search over the stored vectors), so nothing here
-    computes a similarity by hand. Results come back already ordered, which
-    is what makes MRR meaningful downstream.
+    """Retrieve the k chunks closest to a question, nearest first.
 
     The question is embedded as a "query" with the model named in the
-    collection's metadata, the one index_chroma built it with.
+    collection's metadata, the one index_chroma built it with. Chroma does
+    the nearest-neighbour search and returns the results in order.
 
     Args:
         query_str: The question, in natural language.
-        k: How many chunks to return. Defaults to the 5 the agent uses.
-        has_query_prefix: Passed to create_embeddings. False only for the
-            sweep's prefix-off rows.
+        k: How many chunks to return.
+        has_query_prefix: Passed to create_embeddings.
 
     Returns:
-        Up to k `RetrievedChunk`s, nearest first. `distance` is cosine
-        distance, 1 - cos θ: 0 means same direction, smaller is closer.
+        Up to k `RetrievedChunk`s. `distance` is cosine distance, 1 - cos θ:
+        smaller is closer.
 
     Raises:
         NotFoundError: If there is no index yet (run `rs ingest --index`).
-        ValueError: If Chroma's result is missing a field asked for in
-            include=. Shouldn't happen; it's there so the type checker knows
-            the three lists aren't None.
+        ValueError: If Chroma leaves out a field named in include=.
     """
     collection = client.get_collection("chunks")
     model = collection.metadata["embedding_model"]
@@ -229,8 +206,7 @@ def rank_chunks(
     # Chroma answers in columns: one list of ids, one of texts, one of metadata
     # dicts, one of distances. Each column is wrapped in an outer list with one
     # entry per query vector; we sent one, so [0] below is our only answer.
-    # The three columns are typed Optional (only filled when named in include=),
-    # and the check narrows them to non-None for the type checker.
+    # The three columns are typed Optional; the check narrows them for ty.
     documents = results["documents"]
     metadatas = results["metadatas"]
     distances = results["distances"]

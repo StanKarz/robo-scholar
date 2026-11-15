@@ -1,8 +1,9 @@
-"""Pydantic schemas: Chunk, RetrievedChunk, QuizQuestion, JudgeScore, EvalRun."""
+"""Pydantic schemas: chunks, quiz questions, judge scores, eval runs, the golden set."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -129,3 +130,29 @@ class EvalRun(BaseModel):
         if self.overlap_words >= self.n_words:
             raise ValueError("overlap_words must be smaller than n_words")
         return self
+
+
+class GoldenQuestion(BaseModel):
+    """One hand-written question from golden.json, with the labels it's scored on."""
+
+    id: str
+    question: str
+    reference_answer: str
+    source_paper: str
+    source_sections: list[str]
+    source_pages: list[int]
+    difficulty: Literal["easy", "medium", "hard"]
+    tags: list[str]
+
+
+class GoldenSet(BaseModel):
+    """The whole of golden.json: a version, a description and the questions."""
+
+    version: int
+    description: str
+    questions: list[GoldenQuestion]
+
+    @classmethod
+    def load(cls, path: Path) -> GoldenSet:
+        """Read a golden-set file and validate every question in it."""
+        return cls.model_validate_json(path.read_text())
