@@ -1,8 +1,16 @@
 """Typer CLI — thin adapter over the core library. Installed as `rs`."""
 
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING
+
 import typer
 from dotenv import load_dotenv
 from rich.console import Console
+
+if TYPE_CHECKING:
+    from roboscholar.models import EvalRun
 
 # API keys (VOYAGE_API_KEY, ANTHROPIC_API_KEY) live in .env, which is gitignored.
 load_dotenv()
@@ -28,7 +36,6 @@ def fetch(
     ),
 ):
     """Download the paper corpus listed in the manifest and verify checksums."""
-    from pathlib import Path
 
     from rich.table import Table
 
@@ -78,7 +85,6 @@ def ingest(
     ),
 ):
     """Parse documents into chunks; with --index, embed them and rebuild data/chroma/."""
-    from pathlib import Path
 
     from rich.progress import (
         BarColumn,
@@ -252,22 +258,140 @@ def quiz(
     raise typer.Exit(1)
 
 
+GOLDEN_PATH = Path(__file__).resolve().parent / "evals" / "golden.json"
+
+
 @eval_app.command("run")
-def eval_run():
-    """Run retrieval metrics + LLM-as-judge against the golden set; store results."""
+def eval_run(
+    k: int = typer.Option(5, "--k", "-k", help="Chunks retrieved per question."),
+):
+    """Run the retrieval sweep over the golden set and save every row to SQLite."""
+    from roboscholar import db
+    from roboscholar.evals import runner
+    from roboscholar.models import GoldenSet
+
+    run_sweep = getattr(runner, "run_sweep", None)
+    if run_sweep is None:
+        console.print(
+            "[yellow]runner.run_sweep isn't written yet (roboscholar/evals/runner.py).[/yellow]"
+        )
+        raise typer.Exit(1)
+
+    questions = GoldenSet.load(GOLDEN_PATH).questions
+    with console.status(f"Running the sweep over {len(questions)} questions…"):
+        runs, failures = run_sweep(questions, k)
+
+    if runs:
+        sweep_id = db.new_sweep_id()
+        db.save_runs(runs, sweep_id)
+        _print_sweep(sweep_id, runs)
+    else:
+        console.print("[red]No rows to save: every build failed.[/red]")
+
+    if failures:
+        console.print(
+            f"[red]{len(failures)} build(s) failed and were not scored:[/red]"
+        )
+        for failure in failures:
+            console.print(f"  [red]•[/red] {failure}")
+
+    # The sweep rebuilt data/chroma once per config, so it now holds the last
+    # build, not necessarily the one the table picks.
+    from chromadb.errors import NotFoundError
+
+    from roboscholar.retrieval import client
+
+    try:
+        collection = client.get_collection("chunks")
+        live = f"{collection.metadata['embedding_model']}, {collection.count()} chunks"
+    except NotFoundError:
+        live = "no index"
     console.print(
-        "[yellow]Not implemented yet — see roboscholar/evals/runner.py[/yellow]"
+        f"\ndata/chroma holds the last successful build ({live}). "
+        "Rebuild the config you choose with\n"
+        "  uv run rs ingest --n-words N --overlap-words M --index --model MODEL"
     )
-    raise typer.Exit(1)
+    if failures or not runs:
+        raise typer.Exit(1)
 
 
 @eval_app.command("report")
-def eval_report():
-    """Render a comparison table of past eval runs."""
-    console.print(
-        "[yellow]Not implemented yet — see roboscholar/evals/runner.py[/yellow]"
+def eval_report(
+    sweep: str | None = typer.Option(
+        None, help="Sweep id to show. Default: the latest."
+    ),
+    list_all: bool = typer.Option(False, "--list", help="List every saved sweep."),
+):
+    """Show one sweep's rows, best hit-rate first."""
+    from rich.table import Table
+
+    from roboscholar import db
+
+    sweeps = db.list_sweeps()
+    if not sweeps:
+        console.print("[yellow]No sweeps saved yet.[/yellow] Run `uv run rs eval run`.")
+        raise typer.Exit(1)
+
+    if list_all:
+        table = Table(title="Saved sweeps, newest first")
+        for col in ("sweep", "started (UTC)", "rows"):
+            table.add_column(col)
+        for sweep_id, started, n_rows in sweeps:
+            table.add_row(sweep_id, started[:19].replace("T", " "), str(n_rows))
+        console.print(table)
+        return
+
+    sweep_id = sweep or sweeps[0][0]
+    runs = db.load_sweep(sweep_id)
+    if not runs:
+        console.print(f"[red]No sweep with id {sweep_id!r}.[/red] Try --list.")
+        raise typer.Exit(1)
+    _print_sweep(sweep_id, runs)
+    if sweep is None and len(sweeps) > 1:
+        console.print(
+            f"{len(sweeps) - 1} earlier sweep(s): `uv run rs eval report --list`."
+        )
+
+
+def _print_sweep(sweep_id: str, runs: list[EvalRun]) -> None:
+    """One sweep as a table, best hit-rate first, MRR breaking ties.
+
+    "gap" is how many questions behind the top row each row is, the unit the
+    decision rule's tie threshold is written in (NOTES.md, "Retrieval metrics").
+    """
+    from rich.table import Table
+
+    n_questions = {run.n_questions for run in runs}
+    ks = {run.k for run in runs}
+    ranked = sorted(runs, key=lambda run: (run.hit_rate_at_k, run.mrr), reverse=True)
+    top_hits = round(ranked[0].hit_rate_at_k * ranked[0].n_questions)
+
+    table = Table(
+        title=f"Sweep {sweep_id} · {len(runs)} rows · "
+        f"{'/'.join(map(str, sorted(n_questions)))} questions · k={'/'.join(map(str, sorted(ks)))}"
     )
-    raise typer.Exit(1)
+    for col in ("#", "embedder", "prefix", "chunks", "hit@k", "OR hit@k", "MRR", "gap"):
+        is_number = col not in ("embedder", "prefix", "chunks")
+        table.add_column(col, justify="right" if is_number else "left")
+    for i, run in enumerate(ranked, start=1):
+        hits = round(run.hit_rate_at_k * run.n_questions)
+        or_hits = round(run.hit_rate_or_at_k * run.n_questions)
+        table.add_row(
+            str(i),
+            run.embedding_model,
+            "on" if run.has_query_prefix else "off",
+            f"{run.n_words}w / {run.overlap_words}",
+            f"{run.hit_rate_at_k:.3f} ({hits}/{run.n_questions})",
+            f"{run.hit_rate_or_at_k:.3f} ({or_hits})",
+            f"{run.mrr:.3f}",
+            "-" if hits == top_hits else str(hits - top_hits),
+        )
+    console.print(table)
+    if len(n_questions) > 1 or len(ks) > 1:
+        console.print(
+            "[yellow]Rows were scored on different question counts or k; "
+            "they aren't comparable.[/yellow]"
+        )
 
 
 if __name__ == "__main__":
