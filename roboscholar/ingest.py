@@ -55,7 +55,9 @@ class ChunkRecord(TypedDict):
 # figure/table captions: "Fig. 1:", "Figure 2.", "TABLE I:" — the punctuation
 # right after the number separates a caption block from body text that merely
 # says "Figure 3 shows..."
-CAPTION_RE = re.compile(r"^(?:fig(?:ure)?\.?|table)\s+[ivxlcdm\d]+\s*[.:]", re.IGNORECASE)
+CAPTION_RE = re.compile(
+    r"^(?:fig(?:ure)?\.?|table)\s+[ivxlcdm\d]+\s*[.:]", re.IGNORECASE
+)
 
 
 def extract_blocks(pdf_path: str | Path) -> list[Block]:
@@ -221,7 +223,7 @@ def split_sections(
                 continue
             np_ = norm_key(text)
             if np_ and pending.startswith(np_):  # yet another heading line
-                pending = pending[len(np_):]
+                pending = pending[len(np_) :]
                 continue
             pending = ""  # give up, treat as body
 
@@ -254,7 +256,7 @@ def split_sections(
             # (>= 8 chars, so equation fragments like "×K" can't claim a match)
             if len(nb) >= 8 and len(text) <= 90 and nt.startswith(nb):
                 matched, remainder = j, ""
-                pending = nt[len(nb):]
+                pending = nt[len(nb) :]
                 break
         if matched is not None:
             unmatched.extend(headings[hi:matched])  # skipped-over headings never found
