@@ -368,7 +368,8 @@ def _print_sweep(sweep_id: str, runs: list[EvalRun]) -> None:
 
     table = Table(
         title=f"Sweep {sweep_id} · {len(runs)} rows · "
-        f"{'/'.join(map(str, sorted(n_questions)))} questions · k={'/'.join(map(str, sorted(ks)))}"
+        f"{'/'.join(map(str, sorted(n_questions)))} questions · k={'/'.join(map(str, sorted(ks)))}",
+        caption="hit@k, MRR: section rule · OR: section or page · gap: questions behind #1",
     )
     for col in ("#", "embedder", "prefix", "chunks", "hit@k", "OR hit@k", "MRR", "gap"):
         is_number = col not in ("embedder", "prefix", "chunks")
