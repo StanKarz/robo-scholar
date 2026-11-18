@@ -17,8 +17,10 @@ from roboscholar.models import EvalRun, GoldenQuestion
 from roboscholar.retrieval import index_chroma, rank_chunks
 
 # The grid fixed in NOTES.md (12 Nov): 2 models x 2 sizes x 3 overlaps is 12
-# builds, and prefix off for bge only makes 18 rows. Tuples keep the order
-# fixed, and bge comes first so the local builds finish before any Voyage call.
+# builds, and prefix off for bge only makes 18 rows (Voyage always adds its own
+# query instruction via input_type, so it has no off setting). Tuples keep the
+# order fixed, and bge comes first so the local builds finish before any Voyage
+# call.
 MODELS = ("bge-small", "voyage-4-lite")
 N_WORDS = (200, 350)
 OVERLAP_PCTS = (0, 10, 20)
@@ -103,8 +105,8 @@ def score_config(
         embedding_model: The model the loaded index was built with.
         n_words: Chunk size of the loaded index, in words.
         overlap_words: Chunk overlap of the loaded index, in words.
-        has_query_prefix: Whether bge queries get their instruction prefix
-            (Voyage ignores it).
+        has_query_prefix: Whether bge queries get their instruction prefix.
+            Voyage ignores it and always adds its own.
         k: How many chunks to retrieve per question.
 
     Returns:
