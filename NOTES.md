@@ -418,6 +418,49 @@ second judge prompt scoring a question against its source chunk for
 groundedness and non-triviality, and a thumbs-up/down logged when a quiz is
 actually taken.
 
+### Ideas from Jane Street's socratic-tutor skill (2026-11-20)
+
+Source: [janestreet/agent_skills,
+socratic-tutor/SKILL.md](https://github.com/janestreet/agent_skills/blob/master/socratic-tutor/SKILL.md),
+MIT licence, a single 5 KB prompt file for a coding agent. It teaches by
+asking. A diagnostic of 3–5 questions comes before any teaching, a skill map
+rates each sub-skill from 0 to 5, each message ends on one question with
+nothing after it, and grading is strict. Four parts of it answer open
+questions in the paragraph above.
+
+For generating questions, it rotates through five types: predict an
+outcome, explain why, find the flaw in a plausible but wrong claim, apply the
+idea to a new case, and connect two ideas. If the generator has to pick one
+type per question and name it, the judge gets a test for the "trivial"
+failure mode: a question that one sentence of the source chunk answers fits
+none of the five. Find-the-flaw suits papers. Take a claim from the chunk and
+change one detail, e.g. "ACT's temporal ensemble weights the newest
+prediction most" (it's the oldest: w_i = exp(−m·i), w_0 the oldest action,
+act:0012), then ask what's wrong with it.
+
+For grading answers, its rules are: a vague or partially correct answer is
+not correct; don't credit the learner with insight they didn't actually
+express; don't flatter. These go into whatever prompt grades a quiz answer
+against its source chunk (Stan's, like judge.py).
+
+For wrong answers, it first asks a narrower question that exposes the
+contradiction. It explains directly only after 2–3 misses, then re-tests the
+same idea from a different angle. This is the shape for `rs quiz` once it's
+interactive.
+
+For state across sessions, the skill prints a text block to paste into the
+next session. RoboScholar already plans to track wrong answers in SQLite
+(README, Quiz), so storing a level and a last-tested date per (paper,
+section) would give spaced review with no pasting. Its promotion rule is
+worth copying: a level rises only after two checks on separate occasions,
+one of them unprompted recall.
+
+Not borrowed for v0.2: the full tutor (diagnostic, skill map, mastery at
+4/5, a final mixed test). That's the parked "Socratic tutor with a reader
+profile" below, and it's a new feature. Until then the skill works unchanged
+for studying the corpus papers: copy SKILL.md into
+`~/.claude/skills/socratic-tutor/`.
+
 ---
 
 ## Ideas — parked, not built
