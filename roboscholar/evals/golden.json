@@ -40,7 +40,7 @@
     },
     {
       "id": "pi0-001",
-      "question": "What is the overall approach the researchers utilise for incorporating diverse data into the model?",
+      "question": "What is the overall approach the researchers utilise for incorporating diverse data into π0?",
       "reference_answer": "The first step is to use a pre-trained vision-language model (VLM) to import internet-scale experience, which means the model inherits the general knowledge, semantic reasoning and problem-solving abilities of language and vision-language models. The model is further trained to incorporate robot actions, turning it into a vision-language-action model (VLA). To make it feasible to use a variety of diverse robot data sources, cross-embodiment training is employed, where data from many robot types is combined into the same model. Each robot type has a different configuration space and action representation, including single-arm, dual-arm and mobile-manipulator systems. To perform highly dexterous and intricate physical tasks, an action chunking architecture is used with flow matching (a variant of diffusion) to represent continuous action distributions.",
       "source_paper": "pi-0",
       "source_sections": ["Introduction"],
@@ -50,11 +50,11 @@
     },
     {
       "id": "pi0-002",
-      "question": "Describe the pre-training phase and why it is necessary.",
+      "question": "Describe π0's pre-training phase and why it is necessary.",
       "reference_answer": "The pre-training phase uses diverse language labels, combining task names and segment annotations (fine-grained labels for sub-trajectories, typically about 2 seconds in length). The purpose of the pre-training phase is to train a base model that exhibits broad capabilities and generalisation, but is not necessarily specialised for high performance on any one task. The base model can follow language commands and perform a variety of tasks at rudimentary proficiency.",
       "source_paper": "pi-0",
-      "source_sections": ["Overview"],
-      "source_pages": [4],
+      "source_sections": ["Overview", "Data Collection and Training Recipe", "Data Collection and Training Recipe › Pre-training and post-training"],
+      "source_pages": [4, 5, 6],
       "difficulty": "medium",
       "tags": ["pre-training", "training-recipe"]
     },
@@ -70,11 +70,11 @@
     },
     {
       "id": "pi05-001",
-      "question": "What is the main contribution of the authors?",
+      "question": "What is the main contribution of the π0.5 paper?",
       "reference_answer": "A system for training a highly generalisable VLA, combined with a proof of concept that generalisation can emerge from this model when trained on appropriately diverse data. The work demonstrates an end-to-end learning-enabled robotic system that can perform long-horizon and dexterous manipulation skills, e.g. cleaning a kitchen or bedroom, in never-seen-before environments (new homes). This is achieved by transferring knowledge from multiple heterogeneous sources including other robots, high-level semantic prediction, verbal language instruction from human supervisors, web data and other sources.",
       "source_paper": "pi-0.5",
-      "source_sections": ["Introduction"],
-      "source_pages": [3],
+      "source_sections": ["Front matter", "Introduction", "Discussion and Future Work"],
+      "source_pages": [1, 3, 11],
       "difficulty": "easy",
       "tags": ["overview", "generalization"]
     },
@@ -92,7 +92,7 @@
     },
     {
       "id": "pi05-002",
-      "question": "What is the purpose of post-training in this case?",
+      "question": "What is the purpose of post-training in π0.5?",
       "reference_answer": "After the usual training, a second stage of training is performed, referred to as post-training. The goal is to specialise the model to the use case of mobile manipulation in homes and to add an action expert that can produce action chunks via flow matching. This stage jointly trains with next-token prediction to preserve text prediction capabilities, and flow matching for the action expert (initialised with random weights at the beginning of post-training).",
       "source_paper": "pi-0.5",
       "source_sections": [
@@ -117,8 +117,8 @@
       "question": "What are the components of the ACT algorithm, and what problem is each one solving?",
       "reference_answer": "Small errors in a predicted action cause large differences in state, which exacerbates the compounding error problem of imitation learning. ACT addresses this with action chunking, taken from a psychology concept where sequences of actions are grouped and executed as one unit, so the policy predicts target joint positions for the next k timesteps rather than one step at a time. This reduces the effective horizon of the task k-fold. Chunking also handles temporally correlated confounders such as pauses in demonstrations, which Markovian single-step policies struggle with. Temporal ensembling then improves smoothness by querying the policy more frequently and averaging overlapping chunks, and the whole method is implemented with Transformers and trained as a conditional VAE to capture variability in human data.",
       "source_paper": "act",
-      "source_sections": ["I Introduction"],
-      "source_pages": [1, 2],
+      "source_sections": ["I Introduction", "IV Action Chunking with Transformers › IV-A Action Chunking and Temporal Ensemble", "IV Action Chunking with Transformers › IV-B Modeling human data", "VI Ablations"],
+      "source_pages": [1, 2, 4, 5, 9],
       "difficulty": "medium",
       "tags": ["action-chunking", "overview"]
     },
@@ -216,7 +216,7 @@
     },
     {
       "id": "wm-001",
-      "question": "Describe how the learning algorithm works.",
+      "question": "Describe how DreamerV3's learning algorithm works.",
       "reference_answer": "Dreamer (the third generation of the algorithm) is built from three neural networks working together: a world model that predicts what will happen after a given action, a critic that scores how valuable each predicted outcome is, and an actor that picks actions aimed at the most valuable outcomes. All three train at the same time, using experience replayed from the agent's ongoing interaction with the environment. Getting this to work across very different domains is non-trivial, because each of the three networks deals with signals of very different magnitude and has to keep the terms in its own objective balanced without per-domain tuning.",
       "source_paper": "world-models",
       "source_sections": ["Learning algorithm"],
@@ -281,7 +281,7 @@
     },
     {
       "id": "gaia2-003",
-      "question": "How does GAIA-2 improve safety and validation?",
+      "question": "How does GAIA-2's scenario diversity improve safety and validation?",
       "reference_answer": "Through diverse video generation, GAIA-2 unlocks a new level of scenario diversity by dynamically adapting to varied geographic, temporal and environmental conditions - a critical requirement for robust validation. GAIA-2 is capable of synthesising driving scenes across multiple countries, times of day, weather conditions and road types. Beyond this geographic diversity, GAIA-2 enables effortless modulation of time of day and weather conditions, allowing scenarios to seamlessly transition between dawn, midday and night, and supports smooth adaptation across urban, suburban and highway environments. By generating realistic, diverse and precisely controlled scenarios, GAIA-2 reduces reliance on extensive, location-specific real-world data collection. This speeds up testing and validation workflows and helps AI driving systems generalise across regions, adapt to domain shifts effectively, and perform reliably in both routine and edge-case scenarios.",
       "source_paper": "gaia-2",
       "source_sections": [

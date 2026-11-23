@@ -331,6 +331,64 @@ papers vs. blogs. Blogs have no pages and match on section only. Papers and
 blogs overlap on world models (DreamerV3 vs. the GAIA posts), which gives
 natural hard negatives.
 
+### Label audit after the first sweep (2026-11-22)
+
+Sweep `20261117T234037Z` left four voyage-4-lite configs tied: 350w/70 hit
+32 of 34, and 200w/40, 200w/0 and 350w/35 hit 31. `notebooks/eval_check.py`
+rebuilt all four and listed every miss. Three questions explain all of them.
+Ranks below are from a 40-deep search on the 350w/35 index.
+
+| question  | missed by                     | labelled chunk's rank | cause                                                                                                                           |
+| --------- | ----------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| pi05-001  | 3 of 4 (350w/70: rank 4)      | not in top 40         | "What is the main contribution of the authors?" never names π0.5; "authors" and "contribution" matched π0's and π0.5's credits appendices |
+| act-002   | all 4                         | 9                     | label too narrow: only the intro, while IV-A, IV-B and VI's opening paragraph each state a component and the problem it solves |
+| gaia2-003 | all 4                         | 9                     | the question covers the whole "Advancing Safety and Validation" heading (5 subsections); label and reference answer cover one   |
+
+So 350w/70's one-question lead was pi05-001: a question with no paper in it
+landing an intro chunk at rank 4, which is luck. Without it all four configs
+hit the same 31 questions, with MRR between 0.672 and 0.686. The configs are
+tied.
+
+**Rule adopted: a question that points at its source indirectly names it.**
+"The authors", "the model", "in this case" and "the learning algorithm" all
+assume a document. Score A embeds the question with nothing around it, so an
+unnamed question measures luck. Topic questions that assume no document
+(act-001, gaia1-001, dp-002) stay as written, and so does wm-002, since "actor
+and critic" already points at DreamerV3.
+
+Edits, with every reference answer left as written:
+
+| id        | change                                                                                                     |
+| --------- | ---------------------------------------------------------------------------------------------------------- |
+| pi05-001  | question → "What is the main contribution of the π0.5 paper?"                                              |
+| pi05-002  | "…post-training in this case?" → "…post-training in π0.5?"                                                 |
+| pi0-001   | "…into the model?" → "…into π0?"                                                                           |
+| pi0-002   | "Describe the pre-training phase…" → "Describe π0's pre-training phase…" (π0.5 has one too)                |
+| wm-001    | "Describe how the learning algorithm works." → "Describe how DreamerV3's learning algorithm works."        |
+| act-002   | sections + IV-A, IV-B and `VI Ablations` (the parent paragraph, not VI-A/VI-B); pages + 4, 5, 9            |
+| gaia2-003 | question narrowed to "How does GAIA-2's scenario diversity improve safety and validation?"                 |
+
+For gaia2-003 the other option was widening the label to all five
+subsections, which would also mean rewriting the reference answer. Narrowing
+the question keeps the hand-written answer and gives the question one right
+place.
+
+Labels were chosen from the section text, not from what retrieval returned.
+One overlap to know about: act-002's new `VI Ablations` label is the section
+the 350w/35 search ranked first. It's included because its opening paragraph
+lists each component with its problem ("action chunking and temporal
+ensembling to mitigate compounding errors and better handle non-Markovian
+demonstrations … a conditional VAE to model the noisy human
+demonstrations"). VI-A and VI-B are the experiments and stay out, as do IV's
+parent section (the training pipeline, act-003's answer) and IV-C (the
+architecture, act-007's).
+
+Sweep rows from before 2026-11-22 were scored on the old labels and the old
+ingest, so compare configs only within one sweep. Follow-up, 2026-11-23: the
+naming rule backfired for π0, and pi05-001's label was widened (see "Chunk
+config: 350w / 70" below). Next: rerun `rs eval run`,
+then apply the decision rule below to the new rows.
+
 ---
 
 ## Reading queue — candidate papers, not in the corpus
