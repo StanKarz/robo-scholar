@@ -464,6 +464,91 @@ the rule after seeing results lets it drift towards the favourite.
 
 ---
 
+## Chunk config: 350w / 70 (decided 2026-11-23)
+
+Sweep `20261122T234428Z`, the first after the label audit and the ACT ingest
+fix. Voyage rows, plus the best bge row:
+
+| config                 | hit@5 (section) | OR | MRR    |
+| ---------------------- | --------------- | -- | ------ |
+| voyage 350w / 70       | 33              | 33 | 0.6926 |
+| voyage 350w / 35       | 32              | 32 | 0.6892 |
+| voyage 200w / 40       | 32              | 32 | 0.6843 |
+| voyage 200w / 0        | 31              | 31 | 0.6946 |
+| voyage 350w / 0        | 31              | 32 | 0.6833 |
+| voyage 200w / 20       | 30              | 31 | 0.6765 |
+| bge 350w / 70 (prefix) | 27              | 29 | 0.579  |
+
+Applying the rule from "Picking a config": 350w/70, 350w/35 and 200w/40 are
+within 2 questions, so they tie; 200w/0 and 350w/0 sit 2 behind and drop out.
+The tie goes to MRR, and 350w/70 has the highest. bge trails Voyage by 6 or
+more questions, so the bge tiebreak never applies. `eval_check.py` showed the
+one-question gaps inside the tie band come from π questions flipping between
+ranks 4 and 6, so 350w/70 is ahead by a margin of noise on both measures,
+which is the case the rule's tiebreak exists for.
+
+**π0 vs π0.5 is the remaining failure, and it isn't about chunking.** The two
+papers share a lab, a structure (pre-training, post-training, architecture
+sections) and a name: the π0.5 paper mentions π0 throughout ("builds on the
+π0 VLA"), and "π0" is the first half of "π0.5". A chunk's embedding only
+encodes its text, so nothing tells it which paper it came from. On the
+200w/40 index, adding "π0" to two questions in the audit made them worse:
+
+| question | Stan's wording | named | top 10 by paper, named          |
+| -------- | -------------- | ----- | ------------------------------- |
+| pi0-001  | rank 1         | 5     | 7 π0.5, 3 π0 (was 5 / 5)        |
+| pi0-002  | rank 3         | 16    | 9 π0, 1 π0.5                    |
+| pi05-001 | rank 11        | 9     | 7 π0.5 (was 1 π0.5)             |
+
+The names stay anyway. "What does π0 do" is how a user asks, it exposes a real
+weakness, and reverting to recover the score would be fitting questions to
+retrieval. pi0-002 fails inside π0 (9 of its top 10 are π0 chunks), so a
+paper name can't fix it. See the open label question below.
+
+**pi05-001 label widened (2026-11-23):** + `Front matter` and `Discussion and
+Future Work`, pages + 1, 11. The abstract ("We describe π0.5, a new model
+based on π0 that uses co-training on heterogeneous tasks to enable broad
+generalization") and the Discussion's opening ("We described π0.5, a
+co-trained model that builds on the π0 VLA…") both state the contribution.
+
+**Locked in.** `data/chroma` rebuilt at voyage-4-lite 350w/70 (266 chunks),
+orphaned segment folders deleted. Baseline on the current labels (including
+pi0-002's, below), plain search: 34/34, MRR 0.7113. hit@5 is now at the ceiling, so from here Score A
+can only show changes through MRR (or a stricter hit@1/hit@3). New golden
+entries with one right section, and harder cross-paper ones, would give it
+room again.
+
+**Paper filter in the agent's search, decided over contextual chunk headers.**
+Simulated on 350w/70 by taking each question's top 40 and keeping only its
+labelled paper's chunks: still 34/34, MRR 0.7113 → 0.773. All of the gain is
+on five questions: pi0-001 rank 4 → 1, pi0-003 5 → 2, pi0-002 2 → 1, pi05-003
+5 → 4, gaia2-002 2 → 1. That's an upper bound, since it assumes Claude always
+picks the right paper. Why the filter first:
+
+- paper identity is a metadata fact, so filtering on `paper_id` is an exact
+  lookup, while headers ask the embedding to separate identifiers, which is
+  what embeddings are worst at ("π0" and "π0.5" differ by two characters, and
+  both titles contain "Vision-Language-Action Model");
+- it needs no re-embedding and no change to chunks, and it lives in
+  `search_corpus`, which is the next thing to build;
+- the agent's real number is measurable by logging each search's query and
+  filter, and scoring those searches against the labels.
+
+What it gives up: plain search (Score A) is unchanged, and questions that
+don't name a paper get no help. Cross-paper questions (`rs compare`) need the
+filter to take a list of papers or be left off. Contextual headers would help
+both cases, so they're parked until Score B shows the agent failing on paper
+identity (see Ideas).
+
+**pi0-002 label widened (2026-11-23):** + `Data Collection and Training
+Recipe` and its `› Pre-training and post-training` subsection, pages + 5, 6.
+The reference answer comes from π0's Overview, but the Overview itself points
+on ("The pre-training phase (Section V-A)"), and section V opens with the
+purpose of each phase. Same narrow-label pattern as act-002 and pi05-001.
+Plain-search rank 5 → 2 on 350w/70.
+
+---
+
 ## v0.2: quiz, and how to evaluate generated questions
 
 Quiz moved to v0.2 on 2026-11-10. Open problem, raised by a friend: "how do
@@ -525,6 +610,14 @@ for studying the corpus papers: copy SKILL.md into
 
 Parked until retrieval.py and the eval harness are done (CLAUDE.md: no new
 features after Day 10).
+
+**Contextual chunk headers (parked 2026-11-23).** Prepend the paper title and
+section to the text that gets embedded (not to what Claude reads), so each
+chunk's embedding carries its document. It targets the π0/π0.5 confusion in
+plain search and helps questions that don't name a paper, which the agent's
+paper filter can't. Costs a re-embed and a sweep. Revisit if Score B shows
+the agent still failing on paper identity with the filter in place. See
+"Chunk config: 350w / 70".
 
 **Glossary: dropped 2026-09-14.** Marking terms while reading, then resolving
 them into cited definitions, made a second place to write things down and a
