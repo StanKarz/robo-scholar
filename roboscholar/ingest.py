@@ -213,19 +213,35 @@ def split_sections(
     hi = 0
     unmatched: list[Heading] = []
     pending = ""  # rest of a heading whose first line ended the previous block
+    # State from before a partial match, so it can be undone if the next block
+    # doesn't finish the heading: (hi, len(unmatched), blocks taken as heading
+    # lines). Without this a figure label that happens to be a heading prefix
+    # (ACT p.4's "7 Action Chunking") opens the section early, and the body
+    # text that follows lands under the wrong label.
+    partial: tuple[int, int, list[Block]] | None = None
     for page, text in blocks:
         if pending:
             rest = consume_key(text, pending)
             if rest is not None:  # block completes the heading
                 pending = ""
+                partial = None
                 if rest:
                     sections[-1]["blocks"].append((page, rest))
                 continue
             np_ = norm_key(text)
             if np_ and pending.startswith(np_):  # yet another heading line
                 pending = pending[len(np_) :]
+                partial[2].append((page, text))
                 continue
-            pending = ""  # give up, treat as body
+            # Not a heading after all: close the section it opened, give its
+            # lines back to the previous section as body, and let this block
+            # (and the real heading, later) be matched as usual.
+            pending = ""
+            hi, n_unmatched, taken = partial
+            partial = None
+            del unmatched[n_unmatched:]
+            sections.pop()
+            sections[-1]["blocks"].extend(taken)
 
         # references often aren't a ToC entry — force a boundary so the
         # bibliography never pollutes the paper's final section
@@ -257,6 +273,7 @@ def split_sections(
             if len(nb) >= 8 and len(text) <= 90 and nt.startswith(nb):
                 matched, remainder = j, ""
                 pending = nt[len(nb) :]
+                partial = (hi, len(unmatched), [(page, text)])
                 break
         if matched is not None:
             unmatched.extend(headings[hi:matched])  # skipped-over headings never found
@@ -267,6 +284,11 @@ def split_sections(
                 sections[-1]["blocks"].append((page, remainder))
         else:
             sections[-1]["blocks"].append((page, text))
+    if pending:  # document ended mid-heading: undo it the same way
+        hi, n_unmatched, taken = partial
+        del unmatched[n_unmatched:]
+        sections.pop()
+        sections[-1]["blocks"].extend(taken)
     unmatched.extend(headings[hi:])
     return sections, unmatched
 

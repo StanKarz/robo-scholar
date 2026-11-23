@@ -13,6 +13,7 @@ from roboscholar.ingest import (
     ingest_pdf,
     md_sections,
     norm_key,
+    split_sections,
     strip_numbering,
 )
 
@@ -37,7 +38,9 @@ class TestNormalization:
 
 class TestConsumeKey:
     def test_full_match_returns_remainder(self):
-        rest = consume_key("ACTION CHUNKING As we will see", norm_key("Action Chunking"))
+        rest = consume_key(
+            "ACTION CHUNKING As we will see", norm_key("Action Chunking")
+        )
         assert rest == "As we will see"
 
     def test_exact_match_returns_empty(self):
@@ -53,7 +56,12 @@ class TestConsumeKey:
 class TestCaptionFilter:
     @pytest.mark.parametrize(
         "caption",
-        ["Fig. 1: ALOHA setup", "Figure 2. Results", "TABLE I: Success rates", "Table 3: Ablations"],
+        [
+            "Fig. 1: ALOHA setup",
+            "Figure 2. Results",
+            "TABLE I: Success rates",
+            "Table 3: Ablations",
+        ],
     )
     def test_captions_match(self, caption):
         assert CAPTION_RE.match(caption)
@@ -92,6 +100,65 @@ class TestChunking:
         assert all(sum(len(s.split()) for s, _ in c) <= 100 for c in chunks)
 
 
+class TestSplitSections:
+    HEADINGS = [
+        {
+            "level": 1,
+            "title": "III ALOHA: A Low-cost Open-source Hardware System",
+            "page": 3,
+        },
+        {"level": 1, "title": "IV Action Chunking with Transformers", "page": 4},
+    ]
+
+    def _by_title(self, blocks):
+        sections, unmatched = split_sections(blocks, self.HEADINGS)
+        return {s["title"]: [t for _, t in s["blocks"]] for s in sections}, unmatched
+
+    def test_heading_split_across_blocks(self):
+        sections, unmatched = self._by_title(
+            [
+                (3, "III. ALOHA: A LOW-COST OPEN-SOURCE"),
+                (3, "HARDWARE SYSTEM We seek to develop a teleoperation system."),
+                (
+                    4,
+                    "IV. ACTION CHUNKING WITH TRANSFORMERS As we will see in Section V.",
+                ),
+            ]
+        )
+        assert not unmatched
+        assert sections["III ALOHA: A Low-cost Open-source Hardware System"] == [
+            "We seek to develop a teleoperation system."
+        ]
+
+    def test_figure_label_prefix_is_not_a_heading(self):
+        # ACT p.4: a Fig. 5 label "7 Action Chunking" is a prefix of the
+        # section IV title. The next block doesn't continue the heading, so
+        # the label and the section III text after it stay in section III.
+        sections, unmatched = self._by_title(
+            [
+                (
+                    3,
+                    "III. ALOHA: A LOW-COST OPEN-SOURCE HARDWARE SYSTEM We build a rig.",
+                ),
+                (4, "7 Action Chunking"),
+                (4, "x [0.5, 0.3, 0.2, 0.1] ="),
+                (4, "ALOHA enables the teleoperation of precise tasks."),
+                (
+                    4,
+                    "IV. ACTION CHUNKING WITH TRANSFORMERS As we will see in Section V.",
+                ),
+            ]
+        )
+        assert not unmatched
+        assert (
+            "ALOHA enables the teleoperation of precise tasks."
+            in sections["III ALOHA: A Low-cost Open-source Hardware System"]
+        )
+        assert sections["IV Action Chunking with Transformers"] == [
+            "As we will see in Section V."
+        ]
+
+
 class TestMarkdown:
     MD = "# Title\n\nIntro para one two three.\n\n## Section A\n\nBody of section A.\n\n### Sub\n\nNested body."
 
@@ -104,7 +171,9 @@ class TestMarkdown:
 
     def test_ingest_markdown_schema(self, tmp_path):
         md = tmp_path / "post.md"
-        md.write_text("# Post\n\n" + "This is a sentence with several words in it. " * 20)
+        md.write_text(
+            "# Post\n\n" + "This is a sentence with several words in it. " * 20
+        )
         records = ingest_markdown(md, n_words=100, overlap_words=0)
         assert records, "expected at least one chunk"
         r = records[0]
@@ -122,5 +191,13 @@ class TestActIntegration:
         sections = {r["section"] for r in records}
         assert any("Action Chunking" in s for s in sections)
         assert not any("References" in s for s in sections)
+        # section III's last paragraph sits under section IV only if a Fig. 5
+        # label is mistaken for the heading (fixed 2026-11-22)
+        sec_iv = [
+            r for r in records if r["section"] == "IV Action Chunking with Transformers"
+        ]
+        assert sec_iv and not any(
+            "ALOHA enables the teleoperation" in r["text"] for r in sec_iv
+        )
         # pages must be plausible labels for the golden set
         assert all(1 <= r["page_start"] <= r["page_end"] for r in records)

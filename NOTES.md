@@ -203,6 +203,22 @@ and it's the first thing to check when adding a paper.
 | Equation fragment impersonating a heading    | `"×K"` normalizing to `"k"`                | partial match requires ≥8 normalized chars                      |
 | References missing from ToC                  | ACT bibliography polluting Sec. VII        | any `References`/`Bibliography` block forces a section boundary |
 | Non-ASCII symbol in heading silently dropped | `"π0 Model"` → emitted as `"The 0 Model"`  | check the emitted label, not the source heading (pi-0/pi-0.5)   |
+| Figure label impersonating a heading line    | ACT p.4 Fig. 5 label `"7 Action Chunking"` | undo a partial match that the next block doesn't finish         |
+
+**Fixed 2026-11-22: a figure label opened ACT's Sec. IV early.** Fig. 5's
+`"7 Action Chunking"` (an axis tick merged with a label) is a ≥8-character
+prefix of `IV Action Chunking with Transformers`, so the partial-match rule
+opened section IV there. The next block didn't continue the heading, and the
+old code gave up on the continuation but kept the section open. Section III's
+last paragraph (ALOHA's task list) and the Fig. 4/5 label text were labelled
+section IV, and the real heading block (`"IV. ACTION CHUNKING … As we will
+see"`, the merged-heading example in the table above) was read as body text.
+Found while reading act-002's misses: chunk act:0009 was labelled section IV
+but held section III's text. Now a partial match records the state before it,
+and a block that doesn't finish the heading undoes it. A block-level diff of
+all five PDFs moved 8 blocks, all on ACT p.4; `unmatched` is still empty
+everywhere; 2–5 ACT chunks change per grid config. `TestSplitSections` and an
+ACT integration assertion cover it, and both fail on the old code.
 
 **What's dropped.** Figure/table caption blocks (pattern `Fig./Figure/Table +
 number + [.:]`; the punctuation separates a caption from body text saying
@@ -210,6 +226,19 @@ number + [.:]`; the punctuation separates a caption from body text saying
 (`DROP_SECTIONS` in `ingest.py`), which are retrieval noise. Appendices stay:
 they hold hyperparameters and task details. Title, authors and abstract stay
 together in Front matter.
+
+**Known noise, not fixed yet: text drawn inside figures.** Captions are
+dropped, but labels inside a figure (axis ticks, legends, diagram boxes) come
+out as ordinary text blocks and land in chunks. world-models:0000 carries
+"PPO Rainbow MuZero Dreamer 57 tasks, 200M steps Atari…". Measured 2026-11-22
+as blocks under 8 words with no closing punctuation: 3.1–4.5% of words in
+ACT, Diffusion Policy, π0 and π0.5, and 16.6% in DreamerV3, which is mostly
+plots. π0 also has runs of undecodable glyphs (control characters) from figure
+fonts, and the blog chunks keep trafilatura's stray `**` bold markers. A
+candidate fix is to drop text blocks inside a figure's region (image bboxes,
+`page.get_drawings()` clusters, or the area above a caption). It changes chunk
+text in every paper, so it gets its own eval run, separate from the
+2026-11-22 rerun.
 
 **Chunking: sentence-accumulation within sections.** Whole sentences up to
 `n_words`, never crossing a section boundary, so no chunk holds a broken
